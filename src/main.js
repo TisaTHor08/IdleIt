@@ -10,7 +10,8 @@ const ART_H = 20;    // hauteur de la bande en pixels "art" ; scale = pixels phy
 // et hors du dossier d'installation, donc une mise à jour par l'installeur ne touche jamais la sauvegarde.
 app.setPath('userData', path.join(app.getPath('appData'), 'IdleIt Ferme'));
 // Mode capture (tests visuels) : dossier temporaire pour ne jamais toucher à la vraie sauvegarde.
-if (['--farm-shots', '--farm-savetest', '--farm-perf'].some(f => process.argv.includes(f))) app.setPath('userData', path.join(app.getPath('temp'), 'idleit-shots-' + Date.now()));
+const TEST_MODE = ['--farm-shots', '--farm-savetest', '--farm-perf'].some(f => process.argv.includes(f));
+if (TEST_MODE) app.setPath('userData', path.join(app.getPath('temp'), 'idleit-shots-' + Date.now()));
 
 // Sobriété : une bande de 40 px n'a pas besoin du GPU (un processus et ~100 Mo de moins, rendu logiciel suffisant).
 app.disableHardwareAcceleration();
@@ -218,7 +219,8 @@ function createTray() {
   tray.on('click', toggleVisible);
 }
 
-if (!app.requestSingleInstanceLock()) {
+// Une seule ferme à la fois (les modes de test, eux, tournent à côté d'une partie ouverte).
+if (!TEST_MODE && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => { if (win && !win.isVisible()) toggleVisible(); });
@@ -354,7 +356,7 @@ app.on('before-quit', e => {
 const UPDATE_EVERY = 4 * 3600 * 1000;
 const RELEASES_URL = 'https://github.com/TisaTHor08/IdleIt/releases/latest';
 function setupAutoUpdate() {
-  if (!app.isPackaged || process.argv.some(a => a === '--farm-shots' || a === '--farm-savetest')) return;
+  if (!app.isPackaged || process.argv.some(a => a === '--farm-shots' || a === '--farm-savetest' || a === '--farm-perf')) return;
   let autoUpdater;
   try { ({ autoUpdater } = require('electron-updater')); } catch (e) { console.error('electron-updater absent', e); return; }
   const portable = !!process.env.PORTABLE_EXECUTABLE_DIR;
