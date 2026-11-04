@@ -11,7 +11,13 @@ services:
     ports:
       - "${WIKI_PORT:-47320}:80"   # port peu utilisé (hors ports habituels des NAS et des services courants)
     volumes:
-      - site:/usr/share/nginx/html:ro
+      # nocopy : Docker ne recopie pas la page d'accueil par défaut de nginx dans le volume du site
+      - type: volume
+        source: site
+        target: /usr/share/nginx/html
+        read_only: true
+        volume:
+          nocopy: true
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     read_only: true
     tmpfs:
