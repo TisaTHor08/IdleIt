@@ -540,7 +540,8 @@
         const r = C.RECIPE_BY_ID[f.recipe], have = g.s.factory.stock[f.recipe];
         const owned = g.s.pantry[f.id] || 0;
         const targeted = g.s.factory.target === f.id;
-        const fx = f.special.map(x => `<b>${x.path ? C.PET_BY_ID[D.PETS.find(p => p.paths.some(q => q.id === x.path)).id].paths.find(q => q.id === x.path).name : C.PET_BY_ID[x.pet].name}</b> : ${x.desc}`).join('<br>');
+        const pathName = id => { for (const p of D.PETS) { const q = p.paths.find(x => x.id === id); if (q) return q.name; } return id; };
+        const fx = f.special.map(x => `<b>${x.path ? pathName(x.path) : C.PET_BY_ID[x.pet].name}</b> : ${x.desc}` + (x.bal === 'R' ? ' <span style="color:var(--ok)">(+ sa contrepartie disparaît)</span>' : Array.isArray(x.bal) ? ` <span style="color:var(--bad)">Contrepartie : ${D.foodEffect(x.pet || D.PETS.find(p => p.paths.some(q => q.id === x.path)).id, x.path || null, f.id).malus}.</span>` : '')).join('<br>');
         return {
           key: 'fd-' + f.id, icon: S.iconURL('food', 3), title: f.name, level: owned ? `${owned} au placard` : '',
           desc: `${f.units} × ${r.name} (${have ? fmt(have.units) : 0} au frigo) + frais ≈ ${fmt(g.foodFee(f.id) || 0)} $. Pour tous : ${f.any.desc}<br>${fx}`,
@@ -561,10 +562,10 @@
         const owned = g.s.pantry[f.id] || 0, on = pet.food === f.id;
         if (!owned && !on) continue;
         const eff = g.foodEffectFor(pet, f.id);
-        const special = eff !== f.any;
+        const special = eff.special;
         items.push({
           key: 'pf-' + pet.uid + f.id, icon: S.iconURL('food', 3), title: f.name + (on ? ' (équipée)' : ''), level: owned ? `${owned} au placard` : '',
-          desc: (special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc,
+          desc: (special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc + (eff.relief ? ` <span style="color:var(--ok)">Plus de contrepartie : ${eff.relief}.</span>` : '') + (eff.malus ? ` <span style="color:var(--bad)">Contrepartie : ${eff.malus}.</span>` : ''),
           buttons: [on ? { id: 'e', label: 'Retirer', enabled: true, onClick: () => g.equipFood(pet, null) } : { id: 'e', label: 'Donner', cls: 'gold', enabled: owned > 0, onClick: () => g.equipFood(pet, f.id) }],
         });
       }

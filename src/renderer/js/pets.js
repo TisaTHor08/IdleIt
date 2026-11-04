@@ -114,11 +114,7 @@
 
       // ---------- Nourriture ----------
       // Effet d'une gamelle sur ce compagnon : celui de sa voie, sinon de son espèce, sinon l'effet général.
-      foodEffectFor(pet, foodId) {
-        const f = FOOD_BY_ID[foodId];
-        if (!f) return null;
-        return f.special.find(x => x.path && x.path === pet.path) || f.special.find(x => x.pet === pet.id) || f.any;
-      },
+      foodEffectFor(pet, foodId) { return FOOD_BY_ID[foodId] ? D.foodEffect(pet.id, pet.path, foodId) : null; },
       foodEffect(pet) { return pet && pet.food ? this.foodEffectFor(pet, pet.food) : null; },
       // Donne une gamelle du placard (celle qu'il avait déjà y retourne), ou la retire (foodId = null).
       equipFood(pet, foodId) {
@@ -284,7 +280,7 @@
           const at = Math.floor(Math.random() * n);
           for (let i = Math.max(0, at - pm.worm.radius); i <= Math.min(n - 1, at + pm.worm.radius); i++) {
             const pl = this.s.plots[i];
-            if (i === at) { if (pl.crop) { pl.crop = null; this.addStat('plantsLost'); } continue; }
+            if (i === at && !pm.worm.noEat) { if (pl.crop) { pl.crop = null; this.addStat('plantsLost'); } continue; }
             if (pl.crop && pl.crop.p < 1) { pl.crop.p = 1; pl.crop.pest = 0; this.ripen(i); if (pm.worm.giant && !pl.crop.mutant) pl.crop.mutant = 'giant'; }
           }
           main.x = main.tx = plotX(at); main.pause = 3;

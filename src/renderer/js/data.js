@@ -366,7 +366,7 @@
         { pet: 'licorne', desc: 'Licorne des neiges : aura +30% et la terre y reste toujours humide.', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 1.3, evap: 0, wet: true } }) },
         { path: 'harfang', desc: 'Harfang polaire : toutes les 90 s, il fait tomber une averse fraîche sur tout le champ.', mods: pm => addPower(pm, P('rain', 90, { dur: 30 })) },
         { path: 'dragon_orage', desc: 'Dragon de glace : presque plus d’orages, mais toutes les 60 s son souffle glacé fait gagner +25% de croissance à toutes les plantes.', mods: pm => ({ stormMult: 0.2, ...addPower(pm, P('boost', 60, { n: 0.25 })) }) },
-        { pet: 'chat', desc: 'Chat glacé : il lèche sa glace au lieu de jouer : plus aucune récolte perdue.', mods: () => ({ nothing: 0 }) },
+        { pet: 'chat', desc: 'Chat glacé : il lèche sa glace au calme : +3% de doubles récoltes.', mods: pm => ({ double: pm.double + 0.03 }) },
       ] },
     { id: 'gl_tarte_cosmique', recipe: 'tarte_cosmique', units: 6, name: 'Part de tarte cosmique',
       any: { desc: 'Poussière d’étoiles : toutes les 3 min, une plante devient étoilée.', mods: pm => addPower(pm, P('star', 180, { n: 1 })) },
@@ -382,7 +382,7 @@
       special: [
         { pet: 'poussin', desc: 'Couvée : 2 poussins de plus portent l’aura.', mods: pm => ({ chicks: pm.chicks + 2 }) },
         { path: 'rapace', desc: 'Rapace gavé : il ne chasse plus, il couve. 4 poussins avec une aura +40%.', mods: () => ({ chicks: 4, crowHunter: null, perch: false, aura: { mult: 1.4, radius: 16, value: 1, evap: 1 }, move: 'wander' }) },
-        { pet: 'renard', desc: 'Renard repu : il ne chaparde plus rien, et ramène le marchand toutes les 3 min.', mods: pm => ({ nothing: 0, ...addPower(pm, P('cart', 180)) }) },
+        { pet: 'renard', desc: 'Renard repu : il ramène le marchand toutes les 5 min.', mods: pm => addPower(pm, P('cart', 300)) },
         { path: 'nuee', desc: 'Nuée sucrée : toutes les 20 s, les abeilles récoltent elles-mêmes les fruits mûrs de tout le champ.', mods: pm => addPower(pm, P('harvestAura', 20, { all: true, fam: 'fruit' })) },
       ] },
     { id: 'gl_pain', recipe: 'pain', units: 20, name: 'Croûtons',
@@ -404,7 +404,7 @@
     { id: 'gl_huile', recipe: 'huile', units: 14, name: 'Burette d’huile',
       any: { desc: 'Robots rechargés 20% plus vite.', mods: pm => ({ chargeMult: pm.chargeMult * 1.2 }) },
       special: [
-        { path: 'foreuse', desc: 'Foreuse graissée : plus de surconsommation des batteries, et robots encore +20%.', mods: pm => ({ batteryDrain: 1, robotSpeed: pm.robotSpeed * 1.2 }) },
+        { path: 'foreuse', desc: 'Foreuse graissée : robots encore +10%.', mods: pm => ({ robotSpeed: pm.robotSpeed * 1.1 }) },
         { pet: 'taupe', desc: 'Taupe huilée : robots +20% et batteries 2× moins usées.', mods: pm => ({ robotSpeed: pm.robotSpeed * 1.2, batteryDrain: pm.batteryDrain * 0.5 }) },
         { path: 'phenix', desc: 'Phénix à l’huile : son aura s’enflamme. Les plantes y poussent 2× plus vite, mais la terre y sèche 10× plus vite.', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 2, evap: 10 } }) },
         { path: 'dragon_orage', desc: 'Dragon-dynamo : robots rechargés 3× plus vite, et toutes les 2 min il énergise 3 plantes (×100 à la récolte, à cueillir vite).', mods: pm => ({ chargeMult: pm.chargeMult * 3, ...addPower(pm, P('energize', 120, { n: 3 })) }) },
@@ -421,7 +421,7 @@
       any: { desc: 'Tous les légumes +5%.', mods: pm => ({ valueAll: pm.valueAll * 1.05 }) },
       special: [
         { path: 'lynx', desc: 'Lynx gourmand : +10% de doubles récoltes.', mods: pm => ({ double: pm.double + 0.1 }) },
-        { path: 'noir', desc: 'Chat noir chocolat : il porte bonheur au lieu de malheur : 2× moins de corbeaux et plus de récoltes perdues.', mods: () => ({ crowMult: 0.5, nothing: 0 }) },
+        { path: 'noir', desc: 'Chat noir chocolat : il porte bonheur au lieu de malheur : 2× moins de corbeaux.', mods: () => ({ crowMult: 0.5 }) },
         { pet: 'chat', desc: 'Chat comblé : légumes dorés ×1.5.', mods: pm => ({ goldenMult: pm.goldenMult * 1.5 }) },
         { path: 'kitsune', desc: 'Kitsune au chocolat : pendant un marché en folie, les produits transformés se vendent aussi ×2.', mods: () => ({ frenzyFactory: true }) },
         { pet: 'dragon', desc: 'Dragon chocolatier : toutes les 5 min, une foire agricole.', mods: pm => addPower(pm, P('event', 300, { ev: 'foire' })) },
@@ -452,7 +452,7 @@
     { id: 'gl_elixir', recipe: 'elixir', units: 4, name: 'Fiole d’élixir',
       any: { desc: 'Tous les légumes +10%.', mods: pm => ({ valueAll: pm.valueAll * 1.1 }) },
       special: [
-        { pet: 'dragon', desc: 'Dragon apaisé : tous les légumes +30% et il n’attire plus les orages.', mods: pm => ({ valueAll: pm.valueAll * 1.3, stormMult: 1 }) },
+        { pet: 'dragon', desc: 'Dragon apaisé : tous les légumes +10%.', mods: pm => ({ valueAll: pm.valueAll * 1.1 }) },
         { path: 'wyverne', desc: 'Wyverne enragée : elle rugit toutes les 10 s, mais les robots restent figés 4 s.', mods: pm => ({ cry: pm.cry && { ...pm.cry, every: 10, freeze: 4 } }) },
         { path: 'ver', desc: 'Ver géant : il surgit 2× plus souvent et tout ce qu’il fait mûrir devient géant.', mods: pm => ({ worm: pm.worm && { ...pm.worm, every: pm.worm.every / 2, giant: true } }) },
         { pet: 'taupe', desc: 'Taupe alchimiste : toutes les 2 min, 3 plantes deviennent géantes.', mods: pm => addPower(pm, P('giant', 120, { n: 3 })) },
@@ -487,6 +487,261 @@
         { path: 'dragon_orage', desc: 'Orage sucré : il appelle un orage toutes les 3 min.', mods: pm => addPower(pm, P('storm', 180, { dur: 40 })) },
       ] },
   ];
+
+  // Effets spéciaux par espèce (en plus de ceux par voie ci-dessus, qui restent prioritaires).
+  // A(pm) : aura du compagnon, ou une petite aura qu'il gagne grâce à la gamelle.
+  const A = pm => pm.aura || { mult: 1, radius: 18, value: 1, evap: 1 };
+  const MORE_FOODS = {
+    gl_glace: [
+      { pet: 'poussin', desc: 'Poussins givrés : leur aura garde la terre humide et pousse 20% plus vite.', mods: pm => ({ aura: { ...A(pm), mult: A(pm).mult * 1.2, evap: 0, wet: true } }) },
+      { pet: 'chien', desc: 'Chien glacé : il ne halète plus : fermier +25%, et le chien de berger récolte 2× plus vite.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.25, petWorker: pm.petWorker && { ...pm.petWorker, act: pm.petWorker.act * 0.5 } }) },
+      { pet: 'taupe', desc: 'Taupe frigorifiée : elle creuse des puits glacés : 6 parcelles irriguées de plus, et toute la terre sèche 20% moins vite.', mods: pm => ({ irrigateExtra: pm.irrigateExtra + 6, evapAll: pm.evapAll * 0.8 }) },
+      { pet: 'abeille', desc: 'Essaim de givre : toutes les 2 min, une grêle douce arrose tout le champ, et 2× moins de corbeaux.', mods: pm => ({ crowMult: pm.crowMult * 0.5, ...addPower(pm, P('water', 120)) }) },
+      { pet: 'renard', desc: 'Renard polaire : tout blanc, invisible : il chasse les corbeaux aussitôt et garde les silos.', mods: () => ({ crowHunter: { delay: 0.3, reward: 1 }, guardSilo: true }) },
+      { pet: 'hibou', desc: 'Hibou des neiges : nuits glaciales et pures : plus aucun malus de nuit, et une étoile filante toutes les 2 min 30.', mods: pm => ({ nightRelief: 1, ...addPower(pm, P('star', 150, { n: 1 })) }) },
+      { pet: 'dragon', desc: 'Dragon des glaces : 2× moins d’orages, mais un blizzard toutes les 90 s fortifie les plantes (+20% de croissance).', mods: pm => ({ stormMult: pm.stormMult * 0.5, ...addPower(pm, P('boost', 90, { n: 0.2 })) }) },
+    ],
+    gl_tarte_cosmique: [
+      { pet: 'poussin', desc: 'Poussins astraux : toutes les 60 s, une plante devient étoilée.', mods: pm => addPower(pm, P('star', 60, { n: 1 })) },
+      { pet: 'chien', desc: 'Chien de l’espace : il aboie à la lune : une comète toutes les 3 min, et le chien de berger récolte 30% plus vite.', mods: pm => ({ petWorker: pm.petWorker && { ...pm.petWorker, act: pm.petWorker.act * 0.7 }, ...addPower(pm, P('event', 180, { ev: 'comete' })) }) },
+      { pet: 'chat', desc: 'Chat cosmique : il retombe toujours sur une étoile : une plante étoilée toutes les 30 s.', mods: pm => addPower(pm, P('star', 30, { n: 1 })) },
+      { pet: 'taupe', desc: 'Taupe des profondeurs : elle creuse jusqu’aux étoiles : 3 plantes étoilées toutes les 2 min, mais les robots se perdent dans les tunnels (-10%).', mods: pm => ({ robotSpeed: pm.robotSpeed * 0.9, ...addPower(pm, P('star', 120, { n: 3 })) }) },
+      { pet: 'abeille', desc: 'Abeilles galactiques : leur miel brille : miel ×2 et une étoile filante toutes les 2 min.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 2 }, ...addPower(pm, P('star', 120, { n: 1 })) }) },
+      { pet: 'renard', desc: 'Renard astral : il suit les étoiles filantes : une toutes les 100 s, et +1% de légumes dorés.', mods: pm => ({ golden: pm.golden + 0.01, ...addPower(pm, P('event', 100, { ev: 'etoile' })) }) },
+      { pet: 'licorne', desc: 'Licorne cosmique : toutes les 45 s, une plante devient étoilée.', mods: pm => addPower(pm, P('star', 45, { n: 1 })) },
+      { pet: 'dragon', desc: 'Dragon stellaire : une pluie de 8 étoiles filantes toutes les 4 min… mais il grignote aussi 5% des récoltes.', mods: pm => ({ nothing: pm.nothing + 0.05, ...addPower(pm, P('star', 240, { n: 8 })) }) },
+    ],
+    gl_compote: [
+      { pet: 'chien', desc: 'Chien gourmand : il remue la queue : fermier +30%, mais il chipe 2% des récoltes.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.3, nothing: pm.nothing + 0.02 }) },
+      { pet: 'chat', desc: 'Chat repu : il ronronne : les plantes poussent 5% plus vite.', mods: pm => ({ growthAll: pm.growthAll * 1.05 }) },
+      { pet: 'taupe', desc: 'Taupe sucrée : elle sème les pépins sous terre : toutes les 60 s, toutes les parcelles vides se plantent.', mods: pm => addPower(pm, P('plant', 60)) },
+      { pet: 'abeille', desc: 'Abeilles fruitières : toutes les 45 s, elles font mûrir 3 plantes.', mods: pm => addPower(pm, P('ripen', 45, { n: 3 })) },
+      { pet: 'hibou', desc: 'Hibou repu : il ne chasse plus, il ronfle… et ses ronflements font pousser tout le champ (+15%).', mods: pm => ({ growthAll: pm.growthAll * 1.15, crowHunter: null }) },
+      { pet: 'licorne', desc: 'Licorne fruitée : toutes les 2 min, 2 plantes deviennent géantes.', mods: pm => addPower(pm, P('giant', 120, { n: 2 })) },
+      { pet: 'dragon', desc: 'Dragon à la compote : il crache des pépins dorés : une plante dorée toutes les 60 s.', mods: pm => addPower(pm, P('gold', 60, { n: 1 })) },
+    ],
+    gl_pain: [
+      { pet: 'chat', desc: 'Chat boulanger : il pétrit les plantes : toutes les 40 s, 2 plantes mûrissent.', mods: pm => addPower(pm, P('ripen', 40, { n: 2 })) },
+      { pet: 'taupe', desc: 'Taupe aux miettes : ses galeries sont pleines de miettes : chaque nouvelle plante démarre à +20%.', mods: pm => ({ headStart: Math.min(0.9, pm.headStart + 0.2) }) },
+      { pet: 'abeille', desc: 'Abeilles au pain d’épices : le miel rapporte 2× plus.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 2 } }) },
+      { pet: 'renard', desc: 'Renard du boulanger : il ramène des clients : le marchand ambulant paie ×1.5.', mods: pm => ({ cartMult: pm.cartMult * 1.5 }) },
+      { pet: 'hibou', desc: 'Hibou du grenier : il chasse les souris : plus aucun ravageur, et les voleurs fuient les silos.', mods: () => ({ noPests: true, guardSilo: true }) },
+      { pet: 'licorne', desc: 'Licorne nourrie au grain : son aura s’élargit de 50%.', mods: pm => ({ aura: { ...A(pm), radius: A(pm).radius * 1.5 } }) },
+      { pet: 'dragon', desc: 'Dragon fournier : son souffle cuit le pain… et la terre : tout pousse 25% plus vite, mais sèche 50% plus vite.', mods: pm => ({ growthAll: pm.growthAll * 1.25, evapAll: pm.evapAll * 1.5 }) },
+    ],
+    gl_confiture: [
+      { pet: 'poussin', desc: 'Poussins collants : ils attirent les guêpes… qui pollinisent : tous les légumes +8%.', mods: pm => ({ valueAll: pm.valueAll * 1.08 }) },
+      { pet: 'chien', desc: 'Chien barbouillé : il colle aux bottes du fermier (+20%), mais ne court plus après les sangliers.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.2, chaseBoar: false }) },
+      { pet: 'chat', desc: 'Chat confit : il attrape les corbeaux englués.', mods: () => ({ crowHunter: { delay: 1, reward: 1 } }) },
+      { pet: 'taupe', desc: 'Taupe à la confiture : elle colle les racines entre elles : graines lentes +20%.', mods: pm => ({ slowGrowth: pm.slowGrowth * 1.2 }) },
+      { pet: 'hibou', desc: 'Hibou gourmand : toutes les 2 min, il fait mûrir 4 plantes.', mods: pm => addPower(pm, P('ripen', 120, { n: 4 })) },
+      { pet: 'licorne', desc: 'Licorne aux fruits rouges : toutes les 40 s, une plante de son aura devient dorée.', mods: pm => addPower(pm, P('gold', 40, { n: 1, aura: true })) },
+      { pet: 'dragon', desc: 'Dragon confiturier : 2× plus d’orages, et toutes les 3 min ses éclairs caramélisent 2 plantes (énergisées ×100).', mods: pm => ({ stormMult: pm.stormMult * 2, ...addPower(pm, P('energize', 180, { n: 2 })) }) },
+    ],
+    gl_huile: [
+      { pet: 'poussin', desc: 'Poussins huilés : ils glissent partout : leur aura s’étend de 50%.', mods: pm => ({ aura: { ...A(pm), radius: A(pm).radius * 1.5 } }) },
+      { pet: 'chien', desc: 'Chien graissé : il file comme l’éclair : le chien de berger récolte 2× plus vite, et le fermier +15%.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.15, petWorker: pm.petWorker && { ...pm.petWorker, act: pm.petWorker.act * 0.5, walk: pm.petWorker.walk * 1.5 } }) },
+      { pet: 'chat', desc: 'Chat glissant : il renverse l’huile partout : robots +25%, mais 4% des récoltes glissent par terre.', mods: pm => ({ robotSpeed: pm.robotSpeed * 1.25, nothing: pm.nothing + 0.04 }) },
+      { pet: 'abeille', desc: 'Abeilles mécaniques : elles se perchent sur les robots (+15%) et ne piquent plus le fermier.', mods: pm => ({ robotSpeed: pm.robotSpeed * 1.15, farmerSpeed: Math.max(1, pm.farmerSpeed) }) },
+      { pet: 'renard', desc: 'Renard huilé, insaisissable : il chasse sangliers et voleurs, et ramène le marchand toutes les 4 min.', mods: pm => ({ guardSilo: true, chaseBoar: true, ...addPower(pm, P('cart', 240)) }) },
+      { pet: 'hibou', desc: 'Hibou à la lampe à huile : il éclaire les nuits : le fermier ne dort plus et n’a plus de malus de nuit.', mods: () => ({ farmerNoSleep: true, nightRelief: 1 }) },
+      { pet: 'licorne', desc: 'Licorne à la crinière huilée : elle brille : +2% de légumes dorés.', mods: pm => ({ golden: pm.golden + 0.02 }) },
+      { pet: 'dragon', desc: 'Dragon à l’huile : il s’enflamme : tous les légumes +20%, mais 3× plus d’orages.', mods: pm => ({ valueAll: pm.valueAll * 1.2, stormMult: pm.stormMult * 3 }) },
+    ],
+    gl_soupe: [
+      { pet: 'poussin', desc: 'Poussins réchauffés : pas de nuit dans leur aura.', mods: pm => ({ aura: A(pm), auraNoNight: true }) },
+      { pet: 'chat', desc: 'Chat au coin du feu : malus de nuit -30%.', mods: pm => ({ nightRelief: Math.min(1, pm.nightRelief + 0.3) }) },
+      { pet: 'taupe', desc: 'Taupe au bouillon : elle arrose ses galeries : 8 parcelles irriguées de plus.', mods: pm => ({ irrigateExtra: pm.irrigateExtra + 8 }) },
+      { pet: 'abeille', desc: 'Abeilles réchauffées : elles butinent même la nuit : malus de nuit -50%.', mods: pm => ({ nightRelief: Math.min(1, pm.nightRelief + 0.5) }) },
+      { pet: 'renard', desc: 'Renard à la soupe populaire : il rameute des touristes toutes les 3 min.', mods: pm => addPower(pm, P('event', 180, { ev: 'touristes' })) },
+      { pet: 'licorne', desc: 'Licorne au potage : toutes les 60 s, 3 plantes de son aura mûrissent.', mods: pm => addPower(pm, P('ripen', 60, { n: 3, aura: true })) },
+      { pet: 'dragon', desc: 'Dragon en vapeur : sa soupe s’évapore en pluie chaude toutes les 2 min 30, et la terre sèche 20% moins vite.', mods: pm => ({ evapAll: pm.evapAll * 0.8, ...addPower(pm, P('rain', 150, { dur: 30 })) }) },
+    ],
+    gl_chocolat: [
+      { pet: 'poussin', desc: 'Poussins de Pâques : toutes les 2 min, 2 plantes deviennent dorées comme des œufs.', mods: pm => addPower(pm, P('gold', 120, { n: 2 })) },
+      { pet: 'chien', desc: 'Chien surexcité (le chocolat, ce n’est pas pour lui !) : il chasse tout aussitôt, mais le fermier doit le surveiller (-10%).', mods: pm => ({ crowHunter: { delay: 0.2, reward: pm.crowHunter ? pm.crowHunter.reward : 0.5 }, chaseBoar: true, farmerSpeed: pm.farmerSpeed * 0.9 }) },
+      { pet: 'taupe', desc: 'Taupe chocolatière : elle trouve des fèves sous terre : 3% des récoltes valent 10× plus.', mods: pm => ({ gem: pm.gem ? { ...pm.gem, chance: pm.gem.chance + 0.03 } : { chance: 0.03, mult: 10 } }) },
+      { pet: 'abeille', desc: 'Abeilles au cacao : miel au chocolat ×2, et tous les légumes +5%.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 2 }, valueAll: pm.valueAll * 1.05 }) },
+      { pet: 'renard', desc: 'Renard chocolatier : il fait le malin au marché : marché en folie 2× plus fréquent.', mods: pm => ({ frenzyFreq: pm.frenzyFreq * 2 }) },
+      { pet: 'hibou', desc: 'Hibou insomniaque : le chocolat l’empêche de dormir… et le fermier aussi : il ne dort plus.', mods: () => ({ farmerNoSleep: true }) },
+      { pet: 'licorne', desc: 'Licorne pralinée : son aura devient fondante : légumes de l’aura +40%.', mods: pm => ({ aura: { ...A(pm), value: A(pm).value * 1.4 } }) },
+    ],
+    gl_parfum: [
+      { pet: 'poussin', desc: 'Poussins parfumés : l’odeur attire des oies sauvages toutes les 2 min.', mods: pm => addPower(pm, P('event', 120, { ev: 'oies' })) },
+      { pet: 'chien', desc: 'Chien parfumé : il ne sent plus les sangliers… mais les touristes l’adorent : touristes toutes les 3 min.', mods: pm => ({ chaseBoar: false, ...addPower(pm, P('event', 180, { ev: 'touristes' })) }) },
+      { pet: 'chat', desc: 'Chat à l’herbe à chat : il se roule partout : une plante mûrit toutes les 30 s, et +5% de doubles.', mods: pm => ({ double: pm.double + 0.05, ...addPower(pm, P('ripen', 30, { n: 1 })) }) },
+      { pet: 'taupe', desc: 'Taupe parfumée : les corbeaux la suivent sous terre et disparaissent : plus aucun corbeau.', mods: () => ({ noCrows: true }) },
+      { pet: 'renard', desc: 'Renard musqué : il marque son territoire : sangliers et voleurs n’approchent plus.', mods: () => ({ chaseBoar: true, guardSilo: true }) },
+      { pet: 'hibou', desc: 'Hibou envoûté : la nuit sent la rose : une éclipse toutes les 4 min.', mods: pm => addPower(pm, P('event', 240, { ev: 'eclipse' })) },
+      { pet: 'dragon', desc: 'Dragon parfumé : l’orage s’adoucit (2× moins), et toutes les 3 min ses éclairs énergisent 2 plantes.', mods: pm => ({ stormMult: pm.stormMult * 0.5, ...addPower(pm, P('energize', 200, { n: 2 })) }) },
+    ],
+    gl_sorbet_dore: [
+      { pet: 'poussin', desc: 'La poule aux œufs d’or : toutes les 90 s, une plante de l’aura devient dorée.', mods: pm => ({ aura: A(pm), ...addPower(pm, P('gold', 90, { n: 1, aura: true })) }) },
+      { pet: 'chien', desc: 'Chien en or : légumes dorés ×1.3.', mods: pm => ({ goldenMult: pm.goldenMult * 1.3 }) },
+      { pet: 'taupe', desc: 'Taupe orpailleuse : elle filtre la terre : 4% des récoltes valent 8× plus.', mods: pm => ({ gem: pm.gem ? { ...pm.gem, chance: pm.gem.chance + 0.04 } : { chance: 0.04, mult: 8 } }) },
+      { pet: 'abeille', desc: 'Abeilles d’or : toutes les 45 s, une plante devient dorée.', mods: pm => addPower(pm, P('gold', 45, { n: 1 })) },
+      { pet: 'renard', desc: 'Renard doré : il vole… pour toi : toutes les 2 min, il dore 2 plantes.', mods: pm => addPower(pm, P('gold', 120, { n: 2 })) },
+      { pet: 'hibou', desc: 'Hibou aux yeux d’or : +2% de légumes dorés, et des nuits 15% plus courtes.', mods: pm => ({ golden: pm.golden + 0.02, nightSpeed: pm.nightSpeed * 1.15 }) },
+      { pet: 'dragon', desc: 'Dragon goulu : légumes dorés ×2.', mods: pm => ({ goldenMult: pm.goldenMult * 2 }) },
+    ],
+    gl_confiture_doree: [
+      { pet: 'poussin', desc: 'Basse-cour dorée : +2% de légumes dorés et un poussin de plus.', mods: pm => ({ golden: pm.golden + 0.02, chicks: pm.chicks + 1 }) },
+      { pet: 'chien', desc: 'Chien rapporteur de pots : le marchand ambulant paie ×4.', mods: pm => ({ cartMult: pm.cartMult * 4 }) },
+      { pet: 'chat', desc: 'Chat doré : légumes dorés ×1.5 et +1%.', mods: pm => ({ goldenMult: pm.goldenMult * 1.5, golden: pm.golden + 0.01 }) },
+      { pet: 'taupe', desc: 'Taupe dorée : toutes les 2 min, elle fait remonter 2 plantes dorées.', mods: pm => addPower(pm, P('gold', 120, { n: 2 })) },
+      { pet: 'abeille', desc: 'Gelée royale dorée : le miel rapporte 4× plus.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 4 } }) },
+      { pet: 'hibou', desc: 'Hibou au miel d’or : un arc-en-ciel toutes les 3 min.', mods: pm => addPower(pm, P('event', 180, { ev: 'arcenciel' })) },
+      { pet: 'licorne', desc: 'Licorne de miel : toutes les 50 s, une plante de son aura devient dorée.', mods: pm => addPower(pm, P('gold', 50, { n: 1, aura: true })) },
+      { pet: 'dragon', desc: 'Dragon d’or confit : légumes dorés ×1.5 et +2%.', mods: pm => ({ goldenMult: pm.goldenMult * 1.5, golden: pm.golden + 0.02 }) },
+    ],
+    gl_elixir: [
+      { pet: 'poussin', desc: 'Poussins alchimistes : toutes les 60 s, une plante devient géante.', mods: pm => addPower(pm, P('giant', 60, { n: 1 })) },
+      { pet: 'chien', desc: 'Chien immortel : il ne se fatigue jamais : fermier +40%, et le chien de berger récolte 30% plus vite.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.4, petWorker: pm.petWorker && { ...pm.petWorker, act: pm.petWorker.act * 0.7 } }) },
+      { pet: 'chat', desc: 'Chat aux neuf vies : +5% de doubles récoltes.', mods: pm => ({ double: pm.double + 0.05 }) },
+      { pet: 'abeille', desc: 'Abeilles éternelles : leur bonus de valeur double.', mods: pm => ({ valueAll: 1 + (pm.valueAll - 1) * 2 }) },
+      { pet: 'renard', desc: 'Renard philosophe : toutes les 2 min, il change 3 plantes en or.', mods: pm => addPower(pm, P('gold', 120, { n: 3 })) },
+      { pet: 'licorne', desc: 'Licorne de l’élixir : toutes les 40 s, tout ce que touche son aura mûrit.', mods: pm => addPower(pm, P('ripen', 40, { aura: true, n: 99 })) },
+    ],
+    gl_truffes: [
+      { pet: 'poussin', desc: 'Poussins truffés : ils grattent la terre : chaque nouvelle plante démarre à +15%.', mods: pm => ({ headStart: Math.min(0.9, pm.headStart + 0.15) }) },
+      { pet: 'chat', desc: 'Chat de luxe : il ne joue plus qu’avec les dorés : +2% de dorés, dorés ×1.3.', mods: pm => ({ golden: pm.golden + 0.02, goldenMult: pm.goldenMult * 1.3 }) },
+      { pet: 'taupe', desc: 'Taupe truffière : toutes les 90 s, elle déterre une truffe : une plante mûrit et devient dorée.', mods: pm => addPower(pm, P('gold', 90, { n: 1, ripen: true })) },
+      { pet: 'abeille', desc: 'Abeilles au chocolat noir : miel ×2, et 3% des récoltes valent 6× plus.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 2 }, gem: { chance: 0.03, mult: 6 } }) },
+      { pet: 'hibou', desc: 'Hibou gourmet : toutes les 2 min, il récolte tout ce qui est mûr autour de lui.', mods: pm => addPower(pm, P('harvestAura', 120, { radius: 50 })) },
+      { pet: 'licorne', desc: 'Licorne gourmande : légumes de son aura +50%.', mods: pm => ({ aura: { ...A(pm), value: A(pm).value * 1.5 } }) },
+      { pet: 'dragon', desc: 'Dragon des cavernes : il garde son trésor de truffes : tous les légumes +25%.', mods: pm => ({ valueAll: pm.valueAll * 1.25 }) },
+    ],
+    gl_jus: [
+      { pet: 'poussin', desc: 'Poussins désaltérés : leur aura garde la terre humide.', mods: pm => ({ aura: { ...A(pm), evap: 0, wet: true } }) },
+      { pet: 'chien', desc: 'Chien qui s’ébroue : fermier +20%, et il arrose tout le champ toutes les 3 min.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.2, ...addPower(pm, P('water', 180)) }) },
+      { pet: 'chat', desc: 'Chat maladroit : il renverse le jus sur les plantes : 2 plantes mûrissent toutes les 60 s.', mods: pm => addPower(pm, P('ripen', 60, { n: 2 })) },
+      { pet: 'taupe', desc: 'Taupe-source : ses galeries amènent l’eau partout : tout le champ est irrigué.', mods: () => ({ irrigateExtra: 999 }) },
+      { pet: 'abeille', desc: 'Abeilles au nectar : miel ×2, et toutes les 2 min elles arrosent le champ.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 2 }, ...addPower(pm, P('water', 120)) }) },
+      { pet: 'renard', desc: 'Renard vitaminé : il chasse les corbeaux aussitôt (×1.5).', mods: () => ({ crowHunter: { delay: 0.2, reward: 1.5 } }) },
+      { pet: 'hibou', desc: 'Hibou de la rosée : chaque nuit, la rosée arrose : la terre sèche 2× moins vite.', mods: pm => ({ evapAll: pm.evapAll * 0.5 }) },
+      { pet: 'licorne', desc: 'Licorne de source : son aura garde la terre humide et pousse 25% plus vite.', mods: pm => ({ aura: { ...A(pm), mult: A(pm).mult * 1.25, evap: 0, wet: true } }) },
+      { pet: 'dragon', desc: 'Dragon cracheur d’eau : toutes les 90 s, il fait pleuvoir 20 s.', mods: pm => addPower(pm, P('rain', 90, { dur: 20 })) },
+    ],
+    gl_gateau: [
+      { pet: 'chien', desc: 'Chien d’anniversaire : fête au village : le marchand passe toutes les 2 min.', mods: pm => addPower(pm, P('cart', 120)) },
+      { pet: 'chat', desc: 'Chat glouton : il fait la sieste sur le gâteau et rêve : une étoile filante toutes les 3 min.', mods: pm => addPower(pm, P('star', 180, { n: 1 })) },
+      { pet: 'taupe', desc: 'Taupe pâtissière : elle creuse des couches : 5 parcelles irriguées de plus, graines rapides +10%.', mods: pm => ({ irrigateExtra: pm.irrigateExtra + 5, fastGrowth: pm.fastGrowth * 1.1 }) },
+      { pet: 'abeille', desc: 'Abeilles en fête : toutes les 2 min, elles font mûrir 4 plantes.', mods: pm => addPower(pm, P('ripen', 120, { n: 4 })) },
+      { pet: 'renard', desc: 'Renard festif : une foire agricole toutes les 4 min.', mods: pm => addPower(pm, P('event', 240, { ev: 'foire' })) },
+      { pet: 'hibou', desc: 'Hibou noctambule : la fête dure toute la nuit : nuits 30% plus courtes, marché en folie 30% plus fréquent.', mods: pm => ({ nightSpeed: pm.nightSpeed * 1.3, frenzyFreq: pm.frenzyFreq * 1.3 }) },
+      { pet: 'dragon', desc: 'Dragon d’anniversaire : il souffle ses bougies sur le champ : +30% de croissance pour toutes les plantes toutes les 2 min.', mods: pm => addPower(pm, P('boost', 120, { n: 0.3 })) },
+    ],
+    gl_sirop: [
+      { pet: 'poussin', desc: 'Poussins sucrés : leur aura pousse 30% plus vite.', mods: pm => ({ aura: { ...A(pm), mult: A(pm).mult * 1.3 } }) },
+      { pet: 'chien', desc: 'Chien au sirop : il lèche les plantes : 2 plantes mûrissent toutes les 60 s.', mods: pm => addPower(pm, P('ripen', 60, { n: 2 })) },
+      { pet: 'chat', desc: 'Chat au sirop d’érable : il colle aux corbeaux : ils se changent en légumes dorés.', mods: pm => addPower(pm, P('crowGold', 10)) },
+      { pet: 'taupe', desc: 'Taupe sucrée : les racines adorent : graines lentes +25%.', mods: pm => ({ slowGrowth: pm.slowGrowth * 1.25 }) },
+      { pet: 'renard', desc: 'Renard gourmand : le marchand paie ×2 et revient toutes les 4 min.', mods: pm => ({ cartMult: pm.cartMult * 2, ...addPower(pm, P('cart', 240)) }) },
+      { pet: 'hibou', desc: 'Hibou au sirop de fleurs : il appelle des oies sauvages toutes les 2 min.', mods: pm => addPower(pm, P('event', 120, { ev: 'oies' })) },
+      { pet: 'licorne', desc: 'Licorne au sirop : toutes les 60 s, tout ce que touche son aura mûrit.', mods: pm => addPower(pm, P('ripen', 60, { aura: true, n: 99 })) },
+      { pet: 'dragon', desc: 'Dragon sirupeux : toutes les 2 min, ses éclairs caramélisent 2 plantes (énergisées ×100).', mods: pm => addPower(pm, P('energize', 120, { n: 2 })) },
+    ],
+  };
+  for (const f of PET_FOODS) for (const x of MORE_FOODS[f.id] || []) if (!f.special.some(y => y.pet && y.pet === x.pet)) f.special.push(x);
+
+  // ---------- Équilibre des gamelles ----------
+  // Chaque effet spécial est soit un « soulagement » (bal: 'R') : effet modeste, mais la contrepartie actuelle du
+  // compagnon (celle de sa voie, sinon de son espèce) disparaît ; soit un « marché » : effet fort, mais une
+  // contrepartie nouvelle (bal: [type, force]) ; 'T' : la contrepartie est déjà décrite et codée dans l'effet.
+  const RELIEF = {
+    // espèces
+    poussin: { text: 'il ne picore plus : plus de malus de valeur dans son aura', mods: pm => ({ aura: pm.aura && { ...pm.aura, value: Math.max(1, pm.aura.value) } }) },
+    chien: { text: 'il n’aboie plus sur les robots', mods: pm => ({ robotSpeed: Math.max(1, pm.robotSpeed) }) },
+    chat: { text: 'plus aucune récolte perdue', mods: () => ({ nothing: 0 }) },
+    taupe: { text: 'plus de malus sur les graines lentes', mods: pm => ({ slowGrowth: Math.max(1, pm.slowGrowth) }) },
+    abeille: { text: 'elle ne pique plus le fermier', mods: pm => ({ farmerSpeed: Math.max(1, pm.farmerSpeed) }) },
+    renard: { text: 'il ne chaparde plus', mods: () => ({ nothing: 0 }) },
+    hibou: { text: 'le fermier dort enfin bien', mods: pm => ({ farmerSpeed: Math.max(1, pm.farmerSpeed) }) },
+    licorne: { text: 'elle tolère enfin les robots', mods: pm => ({ robotSpeed: Math.max(1, pm.robotSpeed) }) },
+    dragon: { text: 'il n’attire plus les orages', mods: pm => ({ stormMult: Math.min(1, pm.stormMult) }) },
+    // voies
+    basilic: { text: 'les robots ne se figent plus à ses cris', mods: pm => ({ cry: pm.cry && { ...pm.cry, freeze: 0, block: null } }) },
+    phenix: { text: 'son aura n’assèche plus la terre', mods: pm => ({ aura: pm.aura && { ...pm.aura, evap: Math.min(1, pm.aura.evap) } }) },
+    rapace: { text: 'un poussin le suit de nouveau, avec une petite aura', mods: pm => ({ chicks: Math.max(1, pm.chicks), aura: pm.aura || { mult: 1.2, radius: 14, value: 1, evap: 1 } }) },
+    cerbere: { text: 'il travaille aussi le jour', mods: pm => ({ petWorker: pm.petWorker && { ...pm.petWorker, onlyAt: null } }) },
+    loup: { text: 'le marchand n’a plus peur de la meute', mods: () => ({ noCart: false }) },
+    saintbernard: { text: 'il ne surveille plus les robots', mods: pm => ({ robotSpeed: Math.max(1, pm.robotSpeed) }) },
+    noir: { text: 'il ne porte plus malheur', mods: pm => ({ crowMult: Math.min(1, pm.crowMult), nothing: 0 }) },
+    lynx: { text: 'il porte de nouveau chance (+1% de dorés)', mods: pm => ({ golden: pm.golden + 0.01 }) },
+    cheshire: { text: 'les nuits redeviennent normales', mods: pm => ({ nightSpeed: Math.max(1, pm.nightSpeed) }) },
+    foreuse: { text: 'plus de surconsommation des batteries', mods: pm => ({ batteryDrain: Math.min(1, pm.batteryDrain) }) },
+    cristal: { text: 'ses cristaux n’abîment plus les racines', mods: pm => ({ slowGrowth: Math.max(1, pm.slowGrowth) }) },
+    ver: { text: 'il ne dévore plus la plante sous laquelle il surgit', mods: pm => ({ worm: pm.worm && { ...pm.worm, noEat: true } }) },
+    guerriere: { text: 'les frelons ne piquent plus le fermier', mods: pm => ({ farmerSpeed: Math.max(1, pm.farmerSpeed) }) },
+    doree: { text: 'elles pollinisent de nouveau (+5%)', mods: pm => ({ valueAll: pm.valueAll * 1.05 }) },
+    nuee: { text: 'elle ne bouche plus les engrenages ni le soleil', mods: pm => ({ robotSpeed: Math.max(1, pm.robotSpeed), noSolar: false }) },
+    kitsune: { text: 'le marchand n’a plus peur de ses illusions', mods: pm => ({ cartMult: Math.max(1, pm.cartMult) }) },
+    fennec: { text: 'il chasse de nouveau et garde les silos', mods: () => ({ crowHunter: { delay: 1.5, reward: 0.5 }, guardSilo: true }) },
+    renard_roux: { text: 'il ne creuse plus partout', mods: pm => ({ slowGrowth: Math.max(1, pm.slowGrowth) }) },
+    effraie: { text: 'le marchand revient', mods: () => ({ noCart: false }) },
+    harfang: { text: 'les robots se rechargent normalement', mods: pm => ({ chargeMult: Math.max(1, pm.chargeMult) }) },
+    savante: { text: 'elle chasse de nouveau les corbeaux', mods: () => ({ crowHunter: { delay: 1, reward: 0.5 } }) },
+    irisee: { text: 'ses couleurs n’aveuglent plus les plantes', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: 1 + (pm.aura.mult - 1) / 0.7 } }) },
+    sylvestre: { text: 'elle ne boit plus dans les rigoles', mods: pm => ({ aura: pm.aura && { ...pm.aura, evap: Math.min(1, pm.aura.evap) } }) },
+    etoilee: { text: 'son aura retrouve toute sa taille', mods: pm => ({ aura: pm.aura && { ...pm.aura, radius: pm.aura.radius * 2 } }) },
+    dragon_or: { text: 'le marchand revient', mods: () => ({ noCart: false }) },
+    dragon_orage: { text: 'ses orages se calment un peu (-30%)', mods: pm => ({ stormMult: pm.stormMult * 0.7 }) },
+    wyverne: { text: 'les robots ne se figent plus à ses rugissements', mods: pm => ({ cry: pm.cry && { ...pm.cry, freeze: 0 } }) },
+  };
+  // Contreparties nouvelles des effets forts.
+  const pc = x => Math.round(x * 100) + '%';
+  const DRAWBACK = {
+    robots: x => ({ text: `robots -${pc(x)}`, mods: pm => ({ robotSpeed: pm.robotSpeed * (1 - x) }) }),
+    farmer: x => ({ text: `fermier -${pc(x)}`, mods: pm => ({ farmerSpeed: pm.farmerSpeed * (1 - x) }) }),
+    value: x => ({ text: `tous les légumes -${pc(x)}`, mods: pm => ({ valueAll: pm.valueAll * (1 - x) }) }),
+    lost: x => ({ text: `${pc(x)} des récoltes perdues`, mods: pm => ({ nothing: pm.nothing + x }) }),
+    crows: x => ({ text: `${pc(x)} de corbeaux en plus`, mods: pm => ({ crowMult: pm.crowMult * (1 + x) }) }),
+    storms: x => ({ text: `${pc(x)} d’orages en plus`, mods: pm => ({ stormMult: pm.stormMult * (1 + x) }) }),
+    dry: x => ({ text: `la terre sèche ${pc(x)} plus vite`, mods: pm => ({ evapAll: pm.evapAll * (1 + x) }) }),
+    night: x => ({ text: `nuits ${pc(x)} plus longues`, mods: pm => ({ nightSpeed: pm.nightSpeed * (1 - x) }) }),
+    xp: x => ({ text: `compagnons -${pc(x)} d’XP`, mods: pm => ({ petXpMult: pm.petXpMult * (1 - x) }) }),
+    charge: x => ({ text: `recharge des robots -${pc(x)}`, mods: pm => ({ chargeMult: pm.chargeMult * (1 - x) }) }),
+    golden: x => ({ text: `légumes dorés -${pc(x)} de valeur`, mods: pm => ({ goldenMult: pm.goldenMult * (1 - x) }) }),
+    slowSeeds: x => ({ text: `graines lentes -${pc(x)}`, mods: pm => ({ slowGrowth: pm.slowGrowth * (1 - x) }) }),
+    fastSeeds: x => ({ text: `graines rapides -${pc(x)}`, mods: pm => ({ fastGrowth: pm.fastGrowth * (1 - x) }) }),
+    growth: x => ({ text: `toutes les plantes -${pc(x)} de croissance`, mods: pm => ({ growthAll: pm.growthAll * (1 - x) }) }),
+    aura: x => ({ text: `aura ${pc(x)} plus petite`, mods: pm => ({ aura: pm.aura && { ...pm.aura, radius: pm.aura.radius * (1 - x) } }) }),
+    nocart: () => ({ text: 'le marchand ambulant ne vient plus', mods: () => ({ noCart: true }) }),
+  };
+  const BAL = {
+    gl_glace: { phenix: ['night', 0.2], licorne: 'R', harfang: ['farmer', 0.15], dragon_orage: ['robots', 0.15], chat: 'R', poussin: 'R', chien: ['crows', 0.5], taupe: 'R', abeille: 'R', renard: 'R', hibou: 'R', dragon: ['fastSeeds', 0.15] },
+    gl_tarte_cosmique: { ver: ['robots', 0.2], cheshire: ['crows', 0.5], etoilee: ['lost', 0.05], basilic: 'R', hibou: 'R', poussin: ['farmer', 0.1], chien: ['xp', 0.3], chat: ['lost', 0.08], taupe: 'T', abeille: ['storms', 0.5], renard: 'R', licorne: ['aura', 0.2], dragon: 'T' },
+    gl_compote: { poussin: ['value', 0.05], rapace: 'T', renard: 'R', nuee: ['dry', 0.3], chien: 'T', chat: 'R', taupe: ['slowSeeds', 0.15], abeille: ['xp', 0.3], hibou: 'T', licorne: ['lost', 0.04], dragon: ['storms', 0.5] },
+    gl_pain: { chien: ['crows', 0.5], saintbernard: 'T', poussin: 'R', loup: 'T', chat: ['lost', 0.05], taupe: 'R', abeille: 'R', renard: 'R', hibou: 'R', licorne: 'R', dragon: 'T' },
+    gl_confiture: { abeille: ['crows', 0.5], guerriere: ['value', 0.05], renard: 'T', phenix: ['robots', 0.1], poussin: 'R', chien: 'T', chat: 'R', taupe: 'R', hibou: 'R', licorne: ['night', 0.15], dragon: 'T' },
+    gl_huile: { foreuse: 'R', taupe: ['crows', 0.5], phenix: 'T', dragon_orage: ['lost', 0.05], poussin: 'R', chien: ['xp', 0.3], chat: 'T', abeille: 'R', renard: 'R', hibou: ['value', 0.05], licorne: 'R', dragon: 'T' },
+    gl_soupe: { hibou: ['robots', 0.1], cerbere: ['farmer', 0.1], effraie: ['storms', 0.5], chien: ['crows', 0.5], poussin: 'R', chat: 'R', taupe: 'R', abeille: 'R', renard: ['nocart'], licorne: 'R', dragon: ['golden', 0.3] },
+    gl_chocolat: { lynx: 'R', noir: 'R', chat: ['lost', 0.04], kitsune: 'R', dragon: 'R', poussin: ['farmer', 0.1], chien: 'T', taupe: ['robots', 0.1], abeille: 'R', renard: ['nocart'], hibou: ['night', 0.2], licorne: ['aura', 0.3] },
+    gl_parfum: { kitsune: 'R', abeille: 'T', licorne: ['robots', 0.15], renard_roux: ['value', 0.05], poussin: 'R', chien: 'T', chat: ['dry', 0.3], taupe: 'R', renard: 'R', hibou: 'R', dragon: 'R' },
+    gl_sorbet_dore: { licorne: ['growth', 0.1], dragon_or: ['lost', 0.05], doree: 'R', chat: ['crows', 0.5], poussin: 'R', chien: 'R', taupe: 'R', abeille: ['charge', 0.2], renard: ['xp', 0.3], hibou: 'R', dragon: ['storms', 0.5] },
+    gl_confiture_doree: { basilic: ['xp', 0.3], cristal: ['farmer', 0.1], renard: 'R', poussin: 'R', chien: ['crows', 0.5], chat: ['lost', 0.05], taupe: ['robots', 0.1], abeille: ['farmer', 0.15], hibou: 'R', licorne: 'R', dragon: ['dry', 0.3] },
+    gl_elixir: { dragon: 'R', wyverne: 'T', ver: ['robots', 0.15], taupe: ['xp', 0.3], hibou: 'R', poussin: ['value', 0.05], chien: ['crows', 0.5], chat: 'R', abeille: ['farmer', 0.15], renard: ['storms', 0.5], licorne: ['dry', 0.3] },
+    gl_truffes: { cristal: ['night', 0.15], renard: 'R', chien: 'R', poussin: 'R', chat: ['lost', 0.04], taupe: 'R', abeille: ['crows', 0.5], hibou: 'R', licorne: ['charge', 0.2], dragon: ['storms', 0.3] },
+    gl_jus: { nuee: ['golden', 0.3], fennec: 'R', sylvestre: 'R', poussin: 'R', chien: 'R', chat: ['crows', 0.3], taupe: ['robots', 0.15], abeille: ['xp', 0.3], renard: 'R', hibou: 'R', licorne: 'R', dragon: ['charge', 0.3] },
+    gl_gateau: { poussin: 'R', saintbernard: ['xp', 0.3], licorne: 'R', chien: ['crows', 0.5], chat: 'R', taupe: 'R', abeille: 'R', renard: 'R', hibou: ['farmer', 0.1], dragon: ['dry', 0.3] },
+    gl_sirop: { abeille: ['crows', 0.5], phenix: ['night', 0.15], dragon_orage: ['lost', 0.03], poussin: 'R', chien: 'R', chat: 'R', taupe: 'R', renard: ['value', 0.05], hibou: 'R', licorne: ['xp', 0.3], dragon: ['robots', 0.1] },
+  };
+  for (const f of PET_FOODS) for (const x of f.special) x.bal = (BAL[f.id] || {})[x.path || x.pet];
+
+  // Effet final d'une gamelle sur un compagnon (espèce + voie) : { desc, relief, malus, mods(pm), special }.
+  function foodEffect(petId, path, foodId) {
+    const f = PET_FOODS.find(x => x.id === foodId);
+    if (!f) return null;
+    const x = f.special.find(s => s.path && s.path === path) || f.special.find(s => s.pet === petId);
+    if (!x) return { desc: f.any.desc, mods: f.any.mods, special: false };
+    let extra = null, relief = null, malus = null;
+    if (x.bal === 'R') { const r = RELIEF[path] || RELIEF[petId]; relief = r.text; extra = r.mods; }
+    else if (Array.isArray(x.bal)) { const d = DRAWBACK[x.bal[0]](x.bal[1]); malus = d.text; extra = d.mods; }
+    return {
+      desc: x.desc, relief, malus, special: true, bal: x.bal,
+      mods: pm => { const a = x.mods(pm); return extra ? { ...a, ...extra({ ...pm, ...a }) } : a; },
+    };
+  }
 
   // Courbe de prix : chaque niveau coûte g^COST_CURVE fois le précédent (g tel qu'écrit ci-dessus).
   // Toutes les améliorations à niveaux se renchérissent assez vite pour que la ferme progresse sans exploser :
@@ -1129,7 +1384,7 @@
   const DATA = {
     SEEDS, FAMILIES, ECO, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
     BRANCHES, FAST_GROW, TALENTS, SPEC_PENALTY, BIO, SCIENCE, PETS, PET_MOD_DEFAULTS, PET_LEVEL, MASTERY, PERKS, PERK_CATS,
-    FACTORY, MACHINES, RECIPES, FACTORY_ROBOTS, PET_FOODS,
+    FACTORY, MACHINES, RECIPES, FACTORY_ROBOTS, PET_FOODS, foodEffect,
     PRESTIGE, threshold, ACH_BONUS, WEATHER, DAY_LEN, EVENTS, EVENTS_EVERY, EVENT_FX, ACHIEVEMENTS, fmt, fmtTime,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DATA;

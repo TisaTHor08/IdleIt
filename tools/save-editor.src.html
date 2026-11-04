@@ -285,9 +285,10 @@ function pets(v) {
     if (lvl > L.max && !p.path) card.append(h('p', { class: 'warn muted' }, 'La maîtrise (niveaux au-delà de 20) n’agit qu’avec une voie.'));
     card.append(h('div', { class: 'muted' }, def.desc + ' ', h('span', { class: 'warn' }, def.malus)));
     if (p.food) {
-      const f = FOOD[p.food];
-      const eff = f.special.find(x => x.path && x.path === p.path) || f.special.find(x => x.pet === p.id) || f.any;
-      card.append(h('div', { class: 'muted' }, (eff === f.any ? 'Effet de la gamelle : ' : '★ Effet spécial : ') + eff.desc));
+      const eff = D.foodEffect(p.id, p.path || null, p.food);
+      card.append(h('div', { class: 'muted' }, (eff.special ? '★ Effet spécial : ' : 'Effet de la gamelle : ') + eff.desc,
+        eff.relief ? h('span', { style: 'color:var(--ok)' }, ' Plus de contrepartie : ' + eff.relief + '.') : null,
+        eff.malus ? h('span', { class: 'warn' }, ' Contrepartie : ' + eff.malus + '.') : null));
     }
     card.append(h('h3', {}, 'Arbre'), levelRows(def.nodes, n => p.nodes[n.id] || 0, (n, y) => { if (y) p.nodes[n.id] = y; else delete p.nodes[n.id]; }, n => n.max));
     card.append(h('h3', {}, 'Maîtrise'), levelRows(D.MASTERY, m => p.mastery[m.id] || 0, (m, y) => { if (y) p.mastery[m.id] = y; else delete p.mastery[m.id]; }, m => m.max));

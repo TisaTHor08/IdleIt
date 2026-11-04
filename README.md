@@ -10,7 +10,7 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 - Un marché vivant : silos, cours, pénuries, krachs, commandes, produits qui s'abîment
 - Météo (8 temps), orages et éclairs, 13 événements aléatoires, 8 mutations, cultures denses
 - Une **usine de transformation** (fin de partie) : 6 machines, 17 recettes, tapis, robots, frigos, trader et gestionnaire
-- **16 gamelles** pour les compagnons et **63 combinaisons spéciales** qui changent vraiment leur façon de jouer
+- **16 gamelles** pour les compagnons et **180 effets spéciaux** (chaque compagnon, dans chaque état, en a un pour chaque gamelle)
 - Ultra sobre : environ **2 % d'un cœur** et 250 Mo, rendu en 5 à 15 images/s au choix
 - 32 talents de renaissance, 85 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
 - Sauvegarde 100 % automatique, compatible avec un dossier synchronisé (NAS, cloud)
@@ -139,7 +139,11 @@ Un pan de fin de partie, long à maximiser. Une fois l'**usine** construite (ong
 
 Avec la **cuisine pour animaux**, les produits du frigo deviennent des **gamelles**. Une gamelle coûte des produits et des frais. Tu la donnes au compagnon de ton choix, onglet Compagnon : elle agit **tant qu'elle est équipée**. Si tu la retires, l'effet s'arrête et la gamelle revient au placard. Les gamelles et celles qui sont équipées sont gardées à la renaissance.
 
-Chaque gamelle a un effet pour tous, et surtout des **effets spéciaux** selon le compagnon ou sa voie, souvent un peu fous :
+Chaque gamelle donne à **chaque compagnon un effet spécial** qui lui est propre, selon son espèce ou sa voie (180 effets, 100 % des combinaisons). Chaque effet est de l'un de ces deux types :
+- **Soulagement** : un effet modeste, mais la contrepartie actuelle du compagnon **disparaît**. Le chat ne perd plus de récoltes, le basilic ne fige plus les robots, le ver ne dévore plus la plante sous lui, le dragon n'attire plus les orages…
+- **Marché** : un effet fort, mais une **contrepartie nouvelle** : robots ou fermier ralentis, dorés ternis, plus de corbeaux ou d'orages, nuits plus longues, terre qui sèche plus vite, marchand qui ne vient plus…
+
+Quelques exemples :
 
 | Gamelle | Exemples d'effets spéciaux |
 |---|---|

@@ -113,6 +113,19 @@ for (const def of D.PETS) {
 }
 console.log('combinaisons compagnon × voie × gamelle vérifiées :', combos);
 
+// --- Équilibre : un soulagement retire la contrepartie, un marché en ajoute une ---
+const bal = new Game(null);
+bal.s.stats.prestiges = 20; bal.s.money = 1e60;
+const mk = (id, path, food) => ({ uid: 1, id, xp: 1e12, nodes: Object.fromEntries(D.PETS.find(p => p.id === id).nodes.map(n => [n.id, n.max])), path, mastery: {}, food });
+const kitten = food => ({ ...mk('chat', null, food), nodes: {} });
+assert.ok(bal.petMods(kitten(null)).nothing > 0, 'le chat perd des récoltes');
+assert.strictEqual(bal.petMods(kitten('gl_glace')).nothing, 0, 'soulagement : plus de récoltes perdues');
+assert.ok(bal.petMods(mk('dragon', null, 'gl_elixir')).stormMult <= 1, 'soulagement : le dragon n’attire plus les orages');
+assert.ok(bal.petMods(mk('taupe', 'ver', 'gl_pain')).worm.noEat, 'soulagement : le ver ne mange plus');
+const dog = bal.petMods(mk('chien', null, null)).crowMult, dogIce = bal.petMods(mk('chien', null, 'gl_glace')).crowMult;
+assert.ok(dogIce > dog, 'marché : la glace du chien attire des corbeaux');
+assert.ok(bal.petMods(mk('poussin', 'phenix', 'gl_glace')).nightSpeed < bal.petMods(mk('poussin', 'phenix', null)).nightSpeed, 'marché : nuits plus longues pour le phénix givré');
+
 // --- Pouvoirs : ils tournent tous sans erreur ---
 const pw = new Game(null);
 pw.s.stats.prestiges = 20; pw.s.money = 1e60;
