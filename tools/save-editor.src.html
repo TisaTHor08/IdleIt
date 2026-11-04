@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Éditeur de sauvegarde · IdleIt Ferme</title>
+<style>
+  :root { --bg: #1d1712; --panel: #2a2119; --line: #6b4f33; --text: #f4ead8; --muted: #b9a88f; --gold: #ffd84a; --ok: #7ee081; --bad: #ff7b6b; --btn: #5a3f26; --btn-hi: #7a5734; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px 'Segoe UI', Tahoma, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; color: var(--gold); }
+  header .grow { flex: 1; }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: var(--btn); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+  button:hover { background: var(--btn-hi); }
+  button.gold { border-color: #c9962a; color: var(--gold); }
+  button.small { padding: 1px 6px; font-size: 11px; }
+  input[type=number], input[type=text], select { background: #15100c; border: 1px solid var(--line); border-radius: 3px; padding: 2px 5px; }
+  input[type=number] { width: 120px; }
+  main { display: flex; min-height: calc(100vh - 52px); }
+  nav { width: 180px; border-right: 1px solid var(--line); padding: 8px; flex: none; }
+  nav button { display: block; width: 100%; text-align: left; margin-bottom: 3px; background: transparent; border-color: transparent; }
+  nav button.on { background: var(--btn); border-color: var(--line); }
+  #view { flex: 1; padding: 14px 18px; max-width: 1100px; }
+  #drop { margin: 60px auto; max-width: 560px; border: 2px dashed var(--line); border-radius: 10px; padding: 40px; text-align: center; line-height: 1.6; }
+  #drop.over { border-color: var(--gold); background: rgba(255, 216, 74, 0.06); }
+  h2 { font-size: 15px; color: var(--gold); margin: 4px 0 10px; }
+  h3 { font-size: 13px; margin: 16px 0 6px; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 4px 14px; }
+  .f { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; }
+  .f label { flex: 1; }
+  .f .max { color: var(--muted); font-size: 11px; min-width: 52px; text-align: right; }
+  .muted { color: var(--muted); font-size: 11px; }
+  .bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 10px; background: var(--panel); }
+  .card .head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .tag { font-size: 10px; padding: 0 5px; border-radius: 3px; background: #3a2c1e; color: var(--muted); }
+  .chk { display: flex; align-items: center; gap: 5px; padding: 2px 0; }
+  textarea { width: 100%; height: 60vh; background: #15100c; color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 12px Consolas, monospace; }
+  .warn { color: var(--bad); }
+  .note { background: rgba(255, 216, 74, 0.08); border: 1px solid #6b5a2a; border-radius: 5px; padding: 8px 10px; margin-bottom: 12px; line-height: 1.5; }
+  #status { color: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Éditeur de sauvegarde · IdleIt Ferme</h1>
+  <span id="status" class="muted"></span>
+  <span class="grow"></span>
+  <label><input type="file" id="file" accept=".json,application/json" hidden><button id="open">Ouvrir…</button></label>
+  <button id="god" class="gold" hidden>Tout débloquer</button>
+  <button id="dl" class="gold" hidden>Télécharger save.json</button>
+</header>
+<main>
+  <nav id="nav" hidden></nav>
+  <section id="view">
+    <div id="drop">
+      <b style="font-size:15px">Glisse ton <code>save.json</code> ici</b><br>
+      (ou « Ouvrir… »)<br><br>
+      <span class="muted">Le fichier se trouve dans <code>%APPDATA%\IdleIt Ferme\</code>, ou dans le dossier choisi dans les Réglages du jeu.<br>
+      Rien n'est envoyé nulle part : tout se passe dans cette page.</span>
+    </div>
+  </section>
+</main>
+<script>/*DATA*/</script>
+<script>
+'use strict';
+const D = window.FARM_DATA;
+const $ = id => document.getElementById(id);
+const h = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'on') for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn);
+    else if (k === 'class') e.className = v;
+    else if (k in e && k !== 'list') e[k] = v; else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null) e.append(c);
+  return e;
+};
+const BY = list => Object.fromEntries(list.map(x => [x.id, x]));
+const SEED = BY(D.SEEDS), PET = BY(D.PETS), UP = BY(D.UPGRADES), FOOD = BY(D.PET_FOODS);
+const L = D.PET_LEVEL;
+const xpForLevel = lvl => { let x = 0; for (let k = 0; k < lvl; k++) x += k < L.max ? L.base * Math.pow(L.g, k) : L.masteryBase * Math.pow(L.masteryG, k - L.max); return x; };
+const levelOfXp = xp => { let k = 0; while (k < L.max + L.masteryMax && xp >= xpForLevel(k + 1) - 1e-9) k++; return k; };
+
+let save = null, fileName = 'save.json', tab = 'general';
+
+// ---------- Chargement ----------
+function ensure(s) {
+  for (const k of ['up', 'robots', 'seeds', 'tal', 'perks', 'stats', 'ach', 'everSeeds', 'pantry', 'clock', 'market']) if (!s[k] || typeof s[k] !== 'object') s[k] = {};
+  if (!Array.isArray(s.plots)) s.plots = [];
+  if (!s.pets || !Array.isArray(s.pets.list)) s.pets = { list: [], seen: {}, nextUid: 1 };
+  s.pets.seen = s.pets.seen || {};
+  s.pets.nextUid = Math.max(s.pets.nextUid || 1, ...s.pets.list.map(p => (p.uid || 0) + 1));
+  if (!s.trade || typeof s.trade !== 'object') s.trade = { silos: 0, stock: {} };
+  if (!s.factory || typeof s.factory !== 'object') s.factory = {};
+  const f = s.factory;
+  if (!Array.isArray(f.machines)) f.machines = [];
+  f.robots = f.robots || {}; f.stock = f.stock || {}; f.trend = f.trend || {}; f.fridges = f.fridges || 0;
+  for (const k of ['money', 'runEarned', 'totalEarned', 'gsTotal', 'gsSpent']) s[k] = +s[k] || 0;
+  return s;
+}
+function loadText(txt, name) {
+  let data;
+  try { data = JSON.parse(txt); } catch (e) { alert('Ce fichier n’est pas une sauvegarde valide (JSON illisible).'); return; }
+  if (!data || typeof data !== 'object' || !('money' in data)) { alert('Ce fichier ne ressemble pas à une sauvegarde IdleIt Ferme.'); return; }
+  save = ensure(data); fileName = name || 'save.json';
+  const drop = $('drop'); if (drop) drop.remove();
+  $('nav').hidden = false; $('dl').hidden = false; $('god').hidden = false;
+  buildNav(); render();
+  status('Sauvegarde chargée : ' + fileName);
+}
+function status(t) { $('status').textContent = t; }
+$('open').onclick = () => $('file').click();
+$('file').onchange = e => { const f = e.target.files[0]; if (f) f.text().then(t => loadText(t, f.name)); };
+document.addEventListener('dragover', e => { e.preventDefault(); const d = $('drop'); if (d) d.classList.add('over'); });
+document.addEventListener('dragleave', () => { const d = $('drop'); if (d) d.classList.remove('over'); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) f.text().then(t => { if (!save || confirm('Remplacer la sauvegarde en cours d’édition ?')) loadText(t, f.name); });
+});
+$('dl').onclick = () => {
+  const blob = new Blob([JSON.stringify(save)], { type: 'application/json' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: 'save.json' });
+  document.body.append(a); a.click(); a.remove();
+  status('save.json téléchargé : ferme le jeu, puis remplace l’ancien fichier par celui-ci.');
+};
+
+// ---------- Champs génériques ----------
+function num(label, get, set, opts = {}) {
+  const inp = h('input', { type: 'number', value: get(), step: opts.step || 'any', min: opts.min != null ? opts.min : '' });
+  inp.addEventListener('change', () => { const v = inp.value === '' ? 0 : +inp.value; set(Number.isFinite(v) ? v : 0); if (opts.after) opts.after(); });
+  const row = h('div', { class: 'f' }, h('label', { title: opts.tip || '' }, label), inp);
+  if (opts.max != null) row.append(h('span', { class: 'max' }, '/ ' + opts.max));
+  else if (opts.hint) row.append(h('span', { class: 'max' }, opts.hint));
+  return row;
+}
+function chk(label, get, set, tip) {
+  const c = h('input', { type: 'checkbox', checked: !!get() });
+  c.addEventListener('change', () => set(c.checked));
+  return h('label', { class: 'chk', title: tip || '' }, c, label);
+}
+function sel(options, value, onChange) {
+  const s = h('select', {}, options.map(([v, t]) => h('option', { value: v, selected: v === value }, t)));
+  s.addEventListener('change', () => onChange(s.value));
+  return s;
+}
+const era = item => item.pr ? h('span', { class: 'tag', title: 'Dans le jeu : après ' + item.pr + ' renaissance(s)' }, item.pr + ' R') : null;
+
+// ---------- Onglets ----------
+const TABS = [
+  ['general', 'Général'], ['seeds', 'Légumes'], ['field', 'Champ'], ['ups', 'Améliorations'], ['robots', 'Robots'],
+  ['tal', 'Spécialisation'], ['perks', 'Renaissance'], ['pets', 'Compagnons'], ['market', 'Marché'], ['factory', 'Usine'], ['ach', 'Succès'], ['json', 'JSON brut'],
+];
+function buildNav() {
+  const nav = $('nav'); nav.innerHTML = '';
+  for (const [id, name] of TABS) nav.append(h('button', { class: id === tab ? 'on' : '', on: { click: () => { tab = id; buildNav(); render(); } } }, name));
+}
+function render() {
+  const v = $('view'); v.innerHTML = '';
+  ({ general, seeds, field, ups, robots, tal, perks, pets, market, factory, ach, json })[tab](v);
+}
+
+function general(v) {
+  const s = save;
+  v.append(h('h2', {}, 'Général'),
+    h('div', { class: 'note' }, 'Toutes les limites de progression sont levées : tu peux débloquer n’importe quoi sans renaissance. Le jeu garde seulement les maximums de niveau (améliorations, talents, nœuds des compagnons). ',
+      h('b', {}, 'Ferme le jeu avant de remplacer save.json'), ', sinon il réécrit sa propre partie par-dessus.'),
+    h('div', { class: 'grid' },
+      num('Argent ($)', () => s.money, x => { s.money = x; }, { hint: D.fmt(s.money), after: render }),
+      num('Gagné dans la partie ($)', () => s.runEarned, x => { s.runEarned = x; }, { hint: D.fmt(s.runEarned), after: render, tip: 'Compte pour le seuil de renaissance.' }),
+      num('Gagné au total ($)', () => s.totalEarned, x => { s.totalEarned = x; }, { hint: D.fmt(s.totalEarned), after: render }),
+      num('Renaissances', () => s.stats.prestiges || 0, x => { s.stats.prestiges = Math.max(0, Math.floor(x)); }, { min: 0, tip: 'Débloque les ères, les emplacements de compagnons, et fixe le prochain seuil.' }),
+      num('Graines d’or gagnées', () => s.gsTotal, x => { s.gsTotal = Math.max(0, Math.floor(x)); }, { min: 0, after: render, tip: '+1 % de revenus chacune.' }),
+      num('Graines d’or dépensées', () => s.gsSpent, x => { s.gsSpent = Math.max(0, Math.floor(x)); }, { min: 0, after: render }),
+    ),
+    h('p', { class: 'muted' }, `Graines d’or disponibles : ${D.fmt(s.gsTotal - s.gsSpent)} · prochain seuil de renaissance : ${D.fmt(D.threshold(s.stats.prestiges || 0))} $`),
+    h('h3', {}, 'Temps'),
+    h('div', { class: 'grid' },
+      h('div', { class: 'f' }, h('label', {}, 'Météo'), sel(Object.entries(D.WEATHER).map(([k, w]) => [k, w.name]), s.clock.weather || 'soleil', x => { s.clock.weather = x; s.clock.weatherT = 600; })),
+      num('Heure du jour (0 à 1)', () => +((((s.clock.t || 0) / D.DAY_LEN) % 1).toFixed(3)), x => { s.clock.t = Math.floor((s.clock.t || 0) / D.DAY_LEN) * D.DAY_LEN + Math.max(0, Math.min(0.999, x)) * D.DAY_LEN; }, { tip: '0.3 = matin, 0.8 = nuit' }),
+    ));
+}
+
+function seeds(v) {
+  const s = save;
+  v.append(h('h2', {}, 'Légumes débloqués'),
+    h('div', { class: 'bar' },
+      h('button', { on: { click: () => { for (const sd of D.SEEDS) { s.seeds[sd.id] = true; s.everSeeds[sd.id] = true; } render(); } } }, 'Tout débloquer'),
+      h('button', { on: { click: () => { s.seeds = { [D.SEEDS[0].id]: true }; render(); } } }, 'Seulement le radis')),
+    h('div', { class: 'grid' }, D.SEEDS.map(sd => h('div', { class: 'f' },
+      chk(sd.name, () => s.seeds[sd.id], x => { if (x) { s.seeds[sd.id] = true; s.everSeeds[sd.id] = true; } else delete s.seeds[sd.id]; }),
+      h('span', { class: 'muted' }, D.FAMILIES[sd.fam].name), era(sd)))));
+}
+
+function field(v) {
+  const s = save;
+  const plot = () => ({ seed: 'auto', crop: null, moist: 0, last: null, tier: 0 });
+  v.append(h('h2', {}, 'Champ'),
+    h('div', { class: 'grid' },
+      num('Parcelles', () => s.plots.length, x => { const n = Math.max(1, Math.min(400, Math.floor(x))); while (s.plots.length < n) s.plots.push(plot()); s.plots.length = n; }, { min: 1, tip: 'Le jeu n’affiche que ce qui tient à l’écran.' })),
+    h('h3', {}, 'Cultures denses (toutes les parcelles)'),
+    h('div', { class: 'bar' }, D.DENSE.map((d, t) => h('button', { on: { click: () => { s.plots.forEach(p => { p.tier = t; }); status('Toutes les parcelles : ' + d.name); } } }, d.name + ' (×' + d.plants + ')'))),
+    h('h3', {}, 'Plantes'),
+    h('div', { class: 'bar' },
+      h('button', { on: { click: () => { s.plots.forEach(p => { if (p.crop) p.crop.p = 1; }); status('Tout est mûr.'); } } }, 'Tout faire mûrir'),
+      h('button', { on: { click: () => { s.plots.forEach(p => { if (p.crop) p.crop.gold = true; }); status('Tout est doré.'); } } }, 'Tout dorer'),
+      h('button', { on: { click: () => { s.plots.forEach(p => { if (p.crop) p.crop.star = true; }); status('Tout est étoilé (×20).'); } } }, 'Tout étoiler'),
+      h('button', { on: { click: () => { s.plots.forEach(p => { if (p.crop) p.crop.mutant = 'giant'; }); status('Tout est géant.'); } } }, 'Tout en géant'),
+      h('button', { on: { click: () => { s.plots.forEach(p => { p.moist = 1; }); status('Tout est arrosé.'); } } }, 'Tout arroser')),
+    h('p', { class: 'muted' }, 'Les effets s’appliquent aux plantes déjà dans le champ.'));
+}
+
+function levelRows(list, getLvl, setLvl, maxOf) {
+  return h('div', { class: 'grid' }, list.map(x => num(x.name, () => getLvl(x), y => setLvl(x, Math.max(0, Math.floor(y))), { min: 0, max: maxOf(x), tip: x.desc || '' })));
+}
+function ups(v) {
+  const s = save;
+  const tabs = { outils: 'Outils', champ: 'Champ', robots: 'Robots', marche: 'Marché', usine: 'Usine' };
+  v.append(h('h2', {}, 'Améliorations'),
+    h('div', { class: 'bar' },
+      h('button', { on: { click: () => { for (const u of D.UPGRADES) s.up[u.id] = u.max >= 999 ? Math.max(s.up[u.id] || 0, s.plots.length) : u.max; render(); } } }, 'Tout au max'),
+      h('button', { on: { click: () => { s.up = {}; render(); } } }, 'Tout à zéro')),
+    h('p', { class: 'muted' }, 'Le jeu ramène chaque niveau à son maximum s’il est dépassé. Irrigation et paratonnerres : une par parcelle.'));
+  for (const [t, name] of Object.entries(tabs)) {
+    const list = D.UPGRADES.filter(u => u.tab === t);
+    if (!list.length) continue;
+    v.append(h('h3', {}, name), levelRows(list, u => s.up[u.id] || 0, (u, y) => { if (y) s.up[u.id] = y; else delete s.up[u.id]; }, u => (u.max >= 999 ? '∞' : u.max)));
+  }
+}
+function robots(v) {
+  const s = save;
+  v.append(h('h2', {}, 'Robots'), h('p', { class: 'muted' }, 'Aucune limite : la colonne de droite donne le maximum normal du jeu.'),
+    h('div', { class: 'bar' }, h('button', { on: { click: () => { for (const r of D.ROBOTS) s.robots[r.id] = r.max; render(); } } }, 'Tous au max normal')),
+    h('div', { class: 'grid' }, D.ROBOTS.map(r => h('div', { class: 'f' }, h('label', {}, r.name, ' ', era(r)),
+      h('input', { type: 'number', min: 0, value: s.robots[r.id] || 0, on: { change: e => { const n = Math.max(0, Math.floor(+e.target.value || 0)); if (n) s.robots[r.id] = n; else delete s.robots[r.id]; } } }),
+      h('span', { class: 'max' }, '/ ' + r.max)))));
+}
+function tal(v) {
+  const s = save;
+  v.append(h('h2', {}, 'Spécialisation'), h('p', { class: 'muted' }, 'Bio et Science sont exclusives dans le jeu, mais rien ne t’empêche de cumuler ici.'),
+    h('div', { class: 'bar' }, h('button', { on: { click: () => { for (const t of D.TALENTS) s.tal[t.id] = t.max; render(); } } }, 'Tout au max'),
+      h('button', { on: { click: () => { s.tal = {}; render(); } } }, 'Tout à zéro')));
+  for (const b of D.BRANCHES) v.append(h('h3', {}, b.name), levelRows(D.TALENTS.filter(t => t.branch === b.id), t => s.tal[t.id] || 0, (t, y) => { if (y) s.tal[t.id] = y; else delete s.tal[t.id]; }, t => t.max));
+}
+function perks(v) {
+  const s = save;
+  v.append(h('h2', {}, 'Talents de renaissance'), h('p', { class: 'muted' }, 'Achetés gratuitement ici (les graines d’or ne sont pas déduites).'),
+    h('div', { class: 'bar' }, h('button', { on: { click: () => { for (const p of D.PERKS) s.perks[p.id] = p.max; render(); } } }, 'Tout au max'),
+      h('button', { on: { click: () => { s.perks = {}; render(); } } }, 'Tout à zéro')));
+  for (const [cat, name] of Object.entries(D.PERK_CATS)) v.append(h('h3', {}, name), levelRows(D.PERKS.filter(p => p.cat === cat), p => s.perks[p.id] || 0, (p, y) => { if (y) s.perks[p.id] = y; else delete s.perks[p.id]; }, p => p.max));
+}
+
+// ---------- Compagnons ----------
+function maxPet(p) {
+  const def = PET[p.id];
+  for (const n of def.nodes) p.nodes[n.id] = n.max;
+  if (!p.path) p.path = def.paths[0].id;
+  for (const m of D.MASTERY) p.mastery[m.id] = m.max;
+  p.xp = xpForLevel(L.max + L.masteryMax);
+}
+function pets(v) {
+  const s = save;
+  const list = s.pets.list;
+  v.append(h('h2', {}, 'Compagnons'),
+    h('p', { class: 'muted' }, `N’importe quel compagnon, légendaires compris, sans renaissance. Le jeu affiche tous les compagnons de la sauvegarde (même au-delà de ses ${D.PRESTIGE.maxPetSlots} emplacements habituels).`),
+    h('div', { class: 'bar' },
+      h('button', { on: { click: () => { list.push({ uid: s.pets.nextUid++, id: 'poussin', xp: 0, nodes: {}, path: null, mastery: {}, food: null }); s.pets.seen.poussin = true; render(); } } }, '+ Ajouter un compagnon'),
+      h('button', { on: { click: () => { list.forEach(maxPet); render(); } } }, 'Tous au max')));
+  list.forEach((p, idx) => {
+    p.nodes = p.nodes || {}; p.mastery = p.mastery || {};
+    const def = PET[p.id] || D.PETS[0];
+    const lvl = levelOfXp(p.xp || 0);
+    const card = h('div', { class: 'card' });
+    card.append(h('div', { class: 'head' },
+      h('b', {}, '#' + (idx + 1)),
+      sel(D.PETS.map(x => [x.id, x.name + (x.pr ? ' (légendaire, ' + x.pr + ' R)' : '')]), p.id, x => { p.id = x; p.nodes = {}; p.path = null; p.mastery = {}; s.pets.seen[x] = true; render(); }),
+      h('label', {}, 'Niveau ', sel(Array.from({ length: L.max + L.masteryMax + 1 }, (_, k) => [String(k), k > L.max ? `${L.max} + maîtrise ${k - L.max}` : String(k)]), String(lvl), x => { p.xp = xpForLevel(+x); render(); })),
+      h('label', {}, 'Voie ', sel([['', 'aucune'], ...def.paths.map(x => [x.id, x.name])], p.path || '', x => { p.path = x || null; render(); })),
+      h('label', {}, 'Gamelle ', sel([['', 'aucune'], ...D.PET_FOODS.map(f => [f.id, f.name])], p.food || '', x => { p.food = x || null; render(); })),
+      h('button', { class: 'small gold', on: { click: () => { maxPet(p); render(); } } }, 'Max'),
+      h('button', { class: 'small', on: { click: () => { list.splice(idx, 1); render(); } } }, 'Retirer')));
+    if (lvl > L.max && !p.path) card.append(h('p', { class: 'warn muted' }, 'La maîtrise (niveaux au-delà de 20) n’agit qu’avec une voie.'));
+    card.append(h('div', { class: 'muted' }, def.desc + ' ', h('span', { class: 'warn' }, def.malus)));
+    if (p.food) {
+      const f = FOOD[p.food];
+      const eff = f.special.find(x => x.path && x.path === p.path) || f.special.find(x => x.pet === p.id) || f.any;
+      card.append(h('div', { class: 'muted' }, (eff === f.any ? 'Effet de la gamelle : ' : '★ Effet spécial : ') + eff.desc));
+    }
+    card.append(h('h3', {}, 'Arbre'), levelRows(def.nodes, n => p.nodes[n.id] || 0, (n, y) => { if (y) p.nodes[n.id] = y; else delete p.nodes[n.id]; }, n => n.max));
+    card.append(h('h3', {}, 'Maîtrise'), levelRows(D.MASTERY, m => p.mastery[m.id] || 0, (m, y) => { if (y) p.mastery[m.id] = y; else delete p.mastery[m.id]; }, m => m.max));
+    v.append(card);
+  });
+  v.append(h('h3', {}, 'Placard (gamelles non équipées)'),
+    h('div', { class: 'bar' }, h('button', { on: { click: () => { for (const f of D.PET_FOODS) s.pantry[f.id] = Math.max(s.pantry[f.id] || 0, 5); render(); } } }, '5 de chaque')),
+    h('div', { class: 'grid' }, D.PET_FOODS.map(f => num(f.name, () => s.pantry[f.id] || 0, y => { const n = Math.max(0, Math.floor(y)); if (n) s.pantry[f.id] = n; else delete s.pantry[f.id]; }, { min: 0, tip: f.any.desc }))));
+}
+
+function market(v) {
+  const s = save, tr = s.trade;
+  v.append(h('h2', {}, 'Marché'),
+    chk('Marché débloqué', () => s.market.unlocked, x => { s.market.unlocked = x; }),
+    h('div', { class: 'grid' }, num('Silos', () => tr.silos || 0, x => { tr.silos = Math.max(0, Math.min(D.MARKET.siloMax, Math.floor(x))); }, { min: 0, max: D.MARKET.siloMax })),
+    h('h3', {}, 'Stock des silos'),
+    h('div', { class: 'bar' },
+      h('button', { on: { click: () => { tr.stock = {}; render(); } } }, 'Vider les silos'),
+      h('button', { on: { click: () => { for (const e of Object.values(tr.stock || {})) e.fresh = 1; status('Tout le stock est frais.'); } } }, 'Tout rafraîchir')),
+    h('div', { class: 'grid' }, Object.entries(tr.stock || {}).map(([k, e]) => num((SEED[e.seed] ? SEED[e.seed].name : e.seed) + (e.traits && e.traits.length ? ' (' + e.traits.join(', ') + ')' : ''), () => e.units, y => { e.units = Math.max(0, y); }, { min: 0, hint: 'unités' }))));
+}
+
+function factory(v) {
+  const s = save, f = s.factory;
+  const count = t => f.machines.filter(m => m.type === t).length;
+  v.append(h('h2', {}, 'Usine'),
+    h('p', { class: 'muted' }, `Dans le jeu, l’usine arrive après ${D.FACTORY.pr} renaissances. Ici, elle se construit tout de suite.`),
+    chk('Usine construite', () => s.up.usine, x => { if (x) s.up.usine = 1; else delete s.up.usine; }),
+    chk('Cuisine pour animaux', () => s.up.cuisine, x => { if (x) s.up.cuisine = 1; else delete s.up.cuisine; }),
+    h('div', { class: 'bar' }, h('button', { on: { click: () => {
+      s.up.usine = 1; s.up.cuisine = 1; s.up.trader_usine = 1; s.up.gestion_usine = 1;
+      f.machines = []; for (const m of D.MACHINES) for (let k = 0; k < m.max; k++) f.machines.push({ type: m.id, recipe: 'auto', st: 0, t: 0, lot: null });
+      for (const r of D.FACTORY_ROBOTS) f.robots[r.id] = r.max;
+      f.fridges = D.FACTORY.fridgeMax; render();
+    } } }, 'Usine complète')),
+    h('h3', {}, 'Machines'),
+    h('div', { class: 'grid' }, D.MACHINES.map(m => h('div', { class: 'f' }, h('label', {}, m.name, ' ', era(m)),
+      h('input', { type: 'number', min: 0, value: count(m.id), on: { change: e => {
+        const n = Math.max(0, Math.floor(+e.target.value || 0));
+        const recipe = (f.machines.find(x => x.type === m.id) || {}).recipe || 'auto';
+        f.machines = f.machines.filter(x => x.type !== m.id);
+        for (let k = 0; k < n; k++) f.machines.push({ type: m.id, recipe, st: 0, t: 0, lot: null });
+      } } }),
+      h('span', { class: 'max' }, '/ ' + m.max)))),
+    h('h3', {}, 'Robots et frigos'),
+    h('div', { class: 'grid' },
+      D.FACTORY_ROBOTS.map(r => num(r.name, () => f.robots[r.id] || 0, y => { const n = Math.max(0, Math.floor(y)); if (n) f.robots[r.id] = n; else delete f.robots[r.id]; }, { min: 0, max: r.max, tip: r.desc })),
+      num('Frigos', () => f.fridges || 0, y => { f.fridges = Math.max(0, Math.min(D.FACTORY.fridgeMax, Math.floor(y))); }, { min: 0, max: D.FACTORY.fridgeMax })),
+    h('h3', {}, 'Produits au frigo'),
+    h('p', { class: 'muted' }, 'Valeur d’une unité en $ (pour cuisiner une gamelle, il faut assez d’unités et payer des frais proportionnels à cette valeur).'),
+    h('div', { class: 'grid' }, D.RECIPES.map(r => h('div', { class: 'f' }, h('label', {}, r.name),
+      h('input', { type: 'number', min: 0, value: f.stock[r.id] ? f.stock[r.id].units : 0, title: 'unités', on: { change: e => {
+        const n = Math.max(0, +e.target.value || 0);
+        if (n) f.stock[r.id] = { id: r.id, units: n, worth: f.stock[r.id] ? f.stock[r.id].worth : 1, fresh: 1 }; else delete f.stock[r.id];
+      } } })))));
+}
+
+function ach(v) {
+  const s = save;
+  v.append(h('h2', {}, 'Succès'), h('p', { class: 'muted' }, `Chaque succès donne +${D.ACH_BONUS * 100} % de revenus.`),
+    h('div', { class: 'bar' }, h('button', { on: { click: () => { for (const a of D.ACHIEVEMENTS) s.ach[a.id] = true; render(); } } }, 'Tous'),
+      h('button', { on: { click: () => { s.ach = {}; render(); } } }, 'Aucun')),
+    h('div', { class: 'grid' }, D.ACHIEVEMENTS.map(a => chk(a.name, () => s.ach[a.id], x => { if (x) s.ach[a.id] = true; else delete s.ach[a.id]; }, a.desc))));
+}
+
+function json(v) {
+  const ta = h('textarea', { value: JSON.stringify(save, null, 2), spellcheck: false });
+  v.append(h('h2', {}, 'JSON brut'), h('p', { class: 'muted' }, 'Pour tout le reste. « Appliquer » vérifie que le JSON est valide.'), ta,
+    h('div', { class: 'bar' }, h('button', { class: 'gold', on: { click: () => { try { save = ensure(JSON.parse(ta.value)); status('JSON appliqué.'); } catch (e) { alert('JSON invalide : ' + e.message); } } } }, 'Appliquer')));
+}
+
+// ---------- Tout débloquer ----------
+$('god').onclick = () => {
+  if (!confirm('Tout débloquer : légumes, améliorations, robots, talents, renaissance, succès, usine et compagnons au max ?')) return;
+  const s = save;
+  for (const sd of D.SEEDS) { s.seeds[sd.id] = true; s.everSeeds[sd.id] = true; }
+  for (const u of D.UPGRADES) s.up[u.id] = u.max >= 999 ? Math.max(s.up[u.id] || 0, s.plots.length) : u.max;
+  for (const r of D.ROBOTS) s.robots[r.id] = Math.max(s.robots[r.id] || 0, r.max);
+  for (const p of D.PERKS) s.perks[p.id] = p.max;
+  for (const a of D.ACHIEVEMENTS) s.ach[a.id] = true;
+  s.market.unlocked = true; s.trade.silos = D.MARKET.siloMax;
+  for (const p of s.pets.list) maxPet(p);
+  status('Tout est débloqué.');
+  render();
+};
+</script>
+</body>
+</html>

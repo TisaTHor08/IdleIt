@@ -11,6 +11,7 @@
     "debug": "node tools/start.js --farm-debug",
     "sim": "node tools/sim.js",
     "icon": "node tools/make-icon.js",
+    "save-editor": "node tools/make-save-editor.js",
     "build": "electron-builder --win portable nsis"
   },
   "devDependencies": {

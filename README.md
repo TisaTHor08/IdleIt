@@ -181,6 +181,22 @@ Automatique, toutes les 5 s et à la fermeture, dans `%APPDATA%\IdleIt Ferme\sav
 
 ---
 
+## Éditeur de sauvegarde
+
+[`editeur-de-save.html`](editeur-de-save.html) : un seul fichier, à ouvrir dans un navigateur (double-clic). Glisse ton `save.json` dessus et modifie ta partie **sans les limites du jeu** :
+- argent, renaissances, graines d'or ;
+- légumes de n'importe quelle ère, améliorations, robots, talents et talents de renaissance, succès ;
+- compagnons : n'importe lequel, légendaires compris, sans renaissance, avec le niveau (maîtrise comprise), la voie, l'arbre, la maîtrise et la gamelle ;
+- l'usine complète, les frigos, les gamelles du placard ;
+- le champ : parcelles, cultures denses, et tout faire mûrir, dorer, étoiler ou passer en géant ;
+- un onglet JSON brut pour tout le reste.
+
+« Tout débloquer » fait tout ça d'un coup. Puis « Télécharger save.json » : **ferme le jeu** et remplace l'ancien fichier (dans `%APPDATA%\IdleIt Ferme\`, ou dans le dossier choisi dans les Réglages). Rien n'est envoyé nulle part, tout se passe dans la page. Le jeu garde seulement les maximums de niveau (améliorations, talents, nœuds des compagnons).
+
+![Éditeur de sauvegarde](docs/img/editeur.png)
+
+---
+
 ## Développement
 
 Electron + JavaScript, sans framework ni dépendance d'exécution. Node.js 20 ou plus.
@@ -205,6 +221,8 @@ node tools/test-factory.js  # usine, légumes dorés à part, gamelles (576 comb
 node tools/sim-life.js 200 20       # partie complète simulée : 20 renaissances, au plus 200 h
 npm run sim -- 6 50 bota+bio+trade  # une seule partie (branches, +trade = marché)
 npm start -- --farm-savetest        # dossier de sauvegarde et conflits (dossier temporaire)
+npm run save-editor                 # régénère editeur-de-save.html (à relancer quand le contenu du jeu change)
+npx electron tools/test-save-editor.js   # test de l'éditeur (rendu hors écran) : la partie éditée se charge dans le jeu
 npm start -- --farm-perf --farm-demo=tools/demo-factory.js   # CPU et mémoire sur 30 s, temps de rendu / simulation
 npm start -- --farm-shots --farm-demo=tools/demo-v4.js   # captures de chaque onglet dans tools/shots
 python tools/readme-shots.py        # recadre tools/shots pour docs/img

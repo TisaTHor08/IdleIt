@@ -18,7 +18,8 @@
 
     Object.assign(G, {
       // ---------- Emplacements ----------
-      petSlots() { return Math.min(D.PRESTIGE.maxPetSlots, D.PRESTIGE.petSlots + (this.s.stats.prestiges || 0)); },
+      // 1 + 1 par renaissance ; une sauvegarde éditée peut en avoir plus : on les montre tous.
+      petSlots() { return Math.max(this.s.pets.list.length, Math.min(D.PRESTIGE.maxPetSlots, D.PRESTIGE.petSlots + (this.s.stats.prestiges || 0))); },
       petList() { return this.s.pets.list; },
       petByUid(uid) { return this.s.pets.list.find(p => p.uid === uid) || null; },
       petCost(id) { return PET_BY_ID[id].cost * this.fxMul('petCost'); },
