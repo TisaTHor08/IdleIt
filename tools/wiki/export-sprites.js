@@ -22,6 +22,7 @@ app.whenReady().then(async () => {
       return c.toDataURL('image/png');
     };
     for (const sd of D.SEEDS) out['seed-' + sd.id] = S.seedIconURL(sd, SC);
+    for (const sd of D.SEASON_SEEDS) out['seed-' + sd.id] = S.seedIconURL(sd, SC);
     for (const p of D.PETS) for (const look of ['base', 'evo', ...p.paths.map(x => x.id)]) out['pet-' + p.id + '-' + look] = S.petIconURL(p.id, look, SC);
     for (const r of D.ROBOTS) out['robot-' + r.id] = S.robotIconURL(r.id, SC);
     for (const k of Object.keys(S.ICONS)) out['icon-' + k] = S.iconURL(k, SC);

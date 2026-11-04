@@ -32,7 +32,7 @@
         this.s.money -= cost;
         const pet = { uid: this.s.pets.nextUid++, id, xp: 0, nodes: {}, path: null, mastery: {}, food: null };
         const old = this.s.pets.list[slot];
-        if (old && old.food) this.s.pantry[old.food] = (this.s.pantry[old.food] || 0) + 1;
+        if (old && old.food && !(FOOD_BY_ID[old.food] && FOOD_BY_ID[old.food].lost)) this.s.pantry[old.food] = (this.s.pantry[old.food] || 0) + 1;
         if (slot < this.s.pets.list.length) this.s.pets.list[slot] = pet; else this.s.pets.list.push(pet);
         this.s.pets.seen[id] = true;
         this.refreshPet();
@@ -120,7 +120,9 @@
       equipFood(pet, foodId) {
         if (!pet) return false;
         if (foodId && !(this.s.pantry[foodId] > 0)) return false;
-        if (pet.food) this.s.pantry[pet.food] = (this.s.pantry[pet.food] || 0) + 1;
+        // Une gamelle de saison retirée est perdue ; les autres reviennent au placard.
+        if (pet.food && FOOD_BY_ID[pet.food] && FOOD_BY_ID[pet.food].lost) this.emit('food-lost', { id: pet.food });
+        else if (pet.food) this.s.pantry[pet.food] = (this.s.pantry[pet.food] || 0) + 1;
         pet.food = null;
         if (foodId) { this.s.pantry[foodId]--; pet.food = foodId; this.addStat('petMeals'); }
         this.refreshPet();
@@ -147,7 +149,7 @@
           if (p.honey) pm.honey = { every: 60, secs: (pm.honey ? pm.honey.secs : 0) + p.honey.secs * p.honey.every / 60 };
           if (p.gem) pm.gem = { chance: Math.min(0.5, (pm.gem ? pm.gem.chance : 0) + p.gem.chance), mult: Math.max(pm.gem ? pm.gem.mult : 0, p.gem.mult) };
           // Entités dans le champ (le compagnon et ses poussins ; aucune s'il travaille comme ouvrier).
-          const want = p.petWorker ? 0 : 1 + p.chicks;
+          const want = p.petWorker ? 0 : 1 + p.chicks + (pet.id === 'poussin' ? this.seasonChicks() : 0);
           while (r.ents.length < want) {
             const main = !r.ents.length;
             r.ents.push({ kind: main ? 'pet' : 'chick', x: start + rand(-6, 6), tx: start, dir: 1, pause: rand(0, 2), anim: Math.random() * 5 });
@@ -155,6 +157,7 @@
           r.ents.length = want;
         }
         for (const uid of Object.keys(rt)) if (!alive.has(+uid)) delete rt[uid];
+        this.applySeasonMods(pm);
         this.pm = pm;
         this.syncWorkers();
       },
@@ -408,6 +411,7 @@
           case 'cart': if (!this.cart && !this.pm.noCart) { this.cart = { x: plotX(n) + 30, speed: 10, done: false, anim: 0 }; this.emit('cart-arrive'); } break;
           case 'frenzy': if (!(this.s.clock.frenzyT > 0)) { this.s.clock.frenzyT = 45; this.emit('frenzy', { dur: 45 }); } break;
           case 'event': if (this.startEvent) this.startEvent(pw.ev); break;
+          case 'money': { const v = Math.max(50, this.harvestRate() * (pw.secs || 60)) * this.rewardMult(); this.earn(v); this.emit('season-money', { value: v }); break; }
           case 'crowGold': {
             for (const c of this.crows) {
               if (c.state === 'leave') continue;

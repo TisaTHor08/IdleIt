@@ -93,7 +93,8 @@
       };
       add('auto', S.iconURL('auto', 4), 'Pinceau : Auto (toujours la meilleure graine)', true);
       for (const sd of D.SEEDS) if (g.s.seeds[sd.id]) add(sd.id, S.seedIconURL(sd, 4), 'Pinceau : ' + sd.name);
-      this.seedKey = Object.keys(g.s.seeds).join();
+      for (const sd of g.seasonSeeds()) add(sd.id, S.seedIconURL(sd, 4), 'Pinceau : ' + sd.name + ' (saison)');
+      this.seedKey = Object.keys(g.s.seeds).join() + '|' + g.seasonId;
       this.refreshSeedbar();
       requestAnimationFrame(() => this.layoutOverlays());
     }
@@ -116,7 +117,7 @@
       this.envWeather.classList.toggle('off', g.s.clock.weather === 'soleil');
       this.setSrc(this.envFrenzy, S.iconURL('frenzy', 4));
       this.envFrenzy.classList.toggle('off', !g.frenzy());
-      if (Object.keys(g.s.seeds).join() !== this.seedKey) this.buildSeedbar();
+      if (Object.keys(g.s.seeds).join() + '|' + g.seasonId !== this.seedKey) this.buildSeedbar();
       for (const b of $('menu').children) b.classList.toggle('on', b.dataset.tab === this.tab);
     }
 
@@ -267,6 +268,23 @@
           { id: 'brush', label: 'Pinceau', enabled: true, cls: g.brush === 'auto' ? 'on' : '', onClick: () => { g.brush = g.brush === 'auto' ? null : 'auto'; this.refreshSeedbar(); } },
         ],
       }];
+      // Saison en cours : ses bonus et ses deux plantes (gratuites, seulement pendant la saison).
+      const season = g.seasonDef();
+      if (season) {
+        const end = g.seasonInfo.end ? g.seasonInfo.end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
+        items.push({ key: 'season', icon: S.iconURL('prestige', 3), title: `${season.name} à la ferme`, level: end ? `jusqu’au ${end}` : '', desc: `${season.desc} ${season.boosts.join(' · ')}.`, buttons: [] });
+        for (const sd of g.seasonSeeds()) {
+          const val = g.seedValue(sd) * g.valueMult() * g.harvestMult(sd, g.robotCount() ? 'robot' : 'farmer') * g.fxValue(sd);
+          items.push({
+            key: 'ss-' + sd.id, icon: S.seedIconURL(sd, 3), title: sd.name + ' (saison)',
+            desc: `<span class="muted">${D.FAMILIES[sd.fam].name}</span> · ${sd.desc} Pousse en ${fmtTime(sd.grow)} · vaut <b>${fmt(val)} $</b>.`,
+            buttons: [
+              { id: 'all', label: 'Partout', enabled: true, onClick: () => g.setAllPlots(sd.id) },
+              { id: 'brush', label: 'Pinceau', enabled: true, cls: g.brush === sd.id ? 'on' : '', onClick: () => { g.brush = g.brush === sd.id ? null : sd.id; this.refreshSeedbar(); } },
+            ],
+          });
+        }
+      }
       let hidden = 0;
       for (const sd of D.SEEDS) {
         if (!this.eraVisible(sd)) { hidden++; continue; }
@@ -536,7 +554,7 @@
     foodItems() {
       const g = this.game;
       if (!g.factoryUnlocked()) return [];
-      return D.PET_FOODS.map(f => {
+      return D.PET_FOODS.filter(f => !f.season).map(f => {
         const r = C.RECIPE_BY_ID[f.recipe], have = g.s.factory.stock[f.recipe];
         const owned = g.s.pantry[f.id] || 0;
         const targeted = g.s.factory.target === f.id;
@@ -556,8 +574,18 @@
     // Gamelles : celle du compagnon choisi, et celles du placard.
     petFoodItems() {
       const g = this.game, pet = g.s.pets.list[this.petSlot];
-      if (!pet || !g.factoryUnlocked()) return [];
+      if (!pet) return [];
       const items = [];
+      // Cuisine de saison : seulement pendant la fête, avec les légumes de saison récoltés.
+      for (const f of g.seasonFoods()) {
+        const need = f.ingredients.map(i => `${Math.min(g.s.basket[i.seed] || 0, i.n)} / ${i.n} ${C.SEED_BY_ID[i.seed].name}`).join(' · ');
+        items.push({
+          key: 'sf-' + f.id, icon: S.iconURL('food', 3), title: f.name + ' (gamelle de saison)', level: (g.s.pantry[f.id] || 0) ? `${g.s.pantry[f.id]} au placard` : '',
+          desc: `${f.any.desc} <span style="color:var(--bad)">Contrepartie : ${f.any.malus}.</span> <span class="muted">Ingrédients : ${need} + ${fmt(g.seasonFoodFee())} $. Se cuisine seulement pendant la fête, se garde ensuite. La retirer la détruit.</span>`,
+          buttons: [{ id: 'c', label: 'Cuisiner', cls: 'gold', enabled: g.canCraftSeasonFood(f.id), onClick: () => g.craftSeasonFood(f.id) }],
+        });
+      }
+      if (!g.factoryUnlocked() && !items.length && !Object.keys(g.s.pantry).length && !pet.food) return [];
       for (const f of D.PET_FOODS) {
         const owned = g.s.pantry[f.id] || 0, on = pet.food === f.id;
         if (!owned && !on) continue;
@@ -565,8 +593,11 @@
         const special = eff.special;
         items.push({
           key: 'pf-' + pet.uid + f.id, icon: S.iconURL('food', 3), title: f.name + (on ? ' (équipée)' : ''), level: owned ? `${owned} au placard` : '',
-          desc: (special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc + (eff.relief ? ` <span style="color:var(--ok)">Plus de contrepartie : ${eff.relief}.</span>` : '') + (eff.malus ? ` <span style="color:var(--bad)">Contrepartie : ${eff.malus}.</span>` : ''),
-          buttons: [on ? { id: 'e', label: 'Retirer', enabled: true, onClick: () => g.equipFood(pet, null) } : { id: 'e', label: 'Donner', cls: 'gold', enabled: owned > 0, onClick: () => g.equipFood(pet, f.id) }],
+          desc: (f.lost ? '<b style="color:var(--gold)">Gamelle de saison.</b> ' : special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc + (eff.relief ? ` <span style="color:var(--ok)">Plus de contrepartie : ${eff.relief}.</span>` : '') + (eff.malus ? ` <span style="color:var(--bad)">Contrepartie : ${eff.malus}.</span>` : ''),
+          buttons: [on ? (f.lost
+            ? { id: 'e', label: this.foodArmed === pet.uid ? 'Confirmer (détruite)' : 'Retirer et perdre', cls: this.foodArmed === pet.uid ? 'gold' : '', enabled: true, onClick: () => { if (this.foodArmed === pet.uid) { this.foodArmed = null; g.equipFood(pet, null); } else this.foodArmed = pet.uid; } }
+            : { id: 'e', label: 'Retirer', enabled: true, onClick: () => g.equipFood(pet, null) })
+            : { id: 'e', label: 'Donner', cls: 'gold', enabled: owned > 0, tip: f.lost ? 'Gamelle de saison : la retirer plus tard la détruira.' : '', onClick: () => g.equipFood(pet, f.id) }],
         });
       }
       if (!items.length) items.push({ key: 'pf-none', icon: S.iconURL('food', 3), title: 'Aucune gamelle', desc: 'Cuisine des gamelles à l’usine (onglet Usine, « Cuisine pour animaux ») : chacune change les capacités de ton compagnon tant qu’il la porte.', buttons: [] });
@@ -594,7 +625,7 @@
         this.renderPetSlots();
         const pet = g.s.pets.list[this.petSlot];
         this.petTreeHead.classList.toggle('hidden', !pet);
-        this.petFoodHead.classList.toggle('hidden', !pet || !g.factoryUnlocked());
+        this.petFoodHead.classList.toggle('hidden', !pet || (!g.factoryUnlocked() && !g.seasonFoods().length && !Object.keys(g.s.pantry).length));
         setHtml(this.petFoodHead, '<b>Nourriture</b> <span class="muted">— active tant qu’elle est équipée</span>');
         this.petMastHead.classList.toggle('hidden', !pet || !pet.path);
         setHtml(this.petListHead, pet ? 'Remplacer ce compagnon <span class="muted">(sa progression sera perdue)</span>' : 'Adopter un compagnon dans cet emplacement');
@@ -1029,6 +1060,11 @@
           case 'cry': r.addFx('cry', e.x); break;
           case 'cry-blocked': r.addFloater(e.x, '!', '#ff7b6b', true); break;
           case 'worm': r.addFx('worm', C.plotX(e.plot)); break;
+          case 'season-start': { const s = D.SEASONS.find(x => x.id === e.id); this.toast(`${s.name} à la ferme ! ${s.boosts.join(' · ')}. Deux plantes de saison sont dans le pinceau.`, 'gold'); this.buildSeedbar(); r.dirty(); break; }
+          case 'season-end': { const s = D.SEASONS.find(x => x.id === e.id); this.toast(`${s.name} est terminé : ses plantes ne se replantent plus.`); this.buildSeedbar(); r.dirty(); break; }
+          case 'lucky8': r.addFloater(e.plot, '×8 !', '#ff5e3a'); break;
+          case 'food-lost': this.toast(`${C.FOOD_BY_ID[e.id].name} est perdue (gamelle de saison retirée).`); break;
+          case 'season-money': r.addFloater(C.LAYOUT.BARN_W + 6, '+' + fmt(e.value), '#ff5e3a', true); break;
           case 'worm-sweep': r.addFx('sweep', e.from, e.to); this.toast('Le ver cosmique traverse tout le champ !', 'gold'); break;
           case 'food-crafted': this.toast(`Gamelle prête : ${C.FOOD_BY_ID[e.id].name} (onglet Compagnon pour la donner)`, 'gold'); break;
           case 'food-target-done': this.toast(`Le gestionnaire d’usine a cuisiné : ${C.FOOD_BY_ID[e.id].name}`, 'gold'); break;

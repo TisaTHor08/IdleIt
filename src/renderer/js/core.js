@@ -5,11 +5,12 @@
   'use strict';
   const NODE = typeof module !== 'undefined' && module.exports;
   const D = NODE ? require('./data.js') : root.FARM_DATA;
-  const MIXINS = NODE ? [require('./pets.js'), require('./market.js'), require('./events.js'), require('./factory.js')] : (root.FARM_MIXINS || []);
+  const MIXINS = NODE ? [require('./pets.js'), require('./market.js'), require('./events.js'), require('./factory.js'), require('./seasons.js')] : (root.FARM_MIXINS || []);
 
   const LAYOUT = { BARN_W: 26, PLOT_W: 12, PLOT_STEP: 15, PAD: 3 };
   const SAVE_VERSION = 2;
-  const SEED_BY_ID = Object.fromEntries(D.SEEDS.map(s => [s.id, s]));
+  // Les graines de saison sont connues partout (champ, silos, usine) sans entrer dans l'échelle des 44 légumes.
+  const SEED_BY_ID = Object.fromEntries([...D.SEEDS, ...D.SEASON_SEEDS].map(s => [s.id, s]));
   const UP_BY_ID = Object.fromEntries(D.UPGRADES.map(u => [u.id, u]));
   const ROBOT_BY_ID = Object.fromEntries(D.ROBOTS.map(r => [r.id, r]));
   const PERK_BY_ID = Object.fromEntries(D.PERKS.map(p => [p.id, p]));
@@ -45,6 +46,7 @@
       gsTotal: 0, gsSpent: 0, perks: {},
       pets: { list: [], seen: {}, nextUid: 1 },
       pantry: {},                                  // gamelles des compagnons (gardées à la renaissance)
+      basket: {},                                  // légumes de saison récoltés (gamelles de saison)
       factory: defaultFactory(),                   // usine : remise à zéro à la renaissance     // compagnons : gardés à la renaissance, mais remis au niveau 0
       market: { unlocked: false },                 // conservé à la renaissance
       trade: defaultTrade(),                       // silos, stock et cours : remis à zéro à la renaissance
@@ -76,6 +78,7 @@
       if (save && this.load(save)) { /* partie chargée */ } else this.startRun();
       this.rebuildFx();
       this.refreshPet();
+      this.updateSeason(0);
     }
 
     // ---------- Sauvegarde ----------
@@ -109,6 +112,7 @@
       for (const k of ['trend', 'sold', 'made']) tr[k] = { ...(tr[k] || {}) };
       s.trade = tr;
       s.pets = this.loadPets(data.pets, oldVersion);
+      s.basket = Object.fromEntries(Object.entries(data.basket || {}).filter(([k, v]) => SEED_BY_ID[k] && SEED_BY_ID[k].season && v > 0).map(([k, v]) => [k, Math.floor(+v)]));
       s.pantry = Object.fromEntries(Object.entries(data.pantry || {}).filter(([k, v]) => FOOD_BY_ID[k] && v > 0).map(([k, v]) => [k, Math.floor(+v)]));
       for (const pet of s.pets.list) if (!FOOD_BY_ID[pet.food]) pet.food = null;
       s.factory = this.loadFactory(data.factory);
@@ -233,6 +237,9 @@
       };
       for (const u of D.UPGRADES) add(u, this.lvl(u.id));
       for (const p of D.PERKS) add(p, this.perk(p.id));
+      // Bonus et modificateurs de la saison en cours.
+      const season = this.seasonDef && this.seasonDef();
+      if (season && season.fx) for (const e of season.fx) list.push({ ...e, val: e.mult != null ? e.mult : e.add });
       this.fxList = list;
       this.fxMemo = {};
     }
@@ -303,7 +310,7 @@
     bestSeed() { let best = D.SEEDS[0].id, bv = -1; for (const sd of D.SEEDS) if (this.s.seeds[sd.id] && sd.value > bv) { best = sd.id; bv = sd.value; } return best; }
     seedFor(i) {
       const id = this.s.plots[i].seed;
-      return id !== 'auto' && this.s.seeds[id] ? id : this.bestSeed();
+      return id !== 'auto' && (this.s.seeds[id] || this.seasonSeedOk(id)) ? id : this.bestSeed();
     }
     achCount() { return Object.keys(this.s.ach).length; }
     gsAvailable() { return this.s.gsTotal - this.s.gsSpent; }
@@ -380,7 +387,7 @@
     harvestRate() { return this.harvestBuckets.reduce((a, b) => a + b, 0) / this.harvestBuckets.length; }
 
     // ---------- Coûts ----------
-    discount() { return Math.pow(0.95, this.perk('rabais')); }
+    discount() { return Math.pow(0.95, this.perk('rabais')) * this.seasonDiscount(); }
     upCost(id, level = this.lvl(id)) { const u = UP_BY_ID[id]; return u.base * Math.pow(u.g, level) * this.discount(); }
     upMax(id) { return id === 'irrigation' || id === 'paratonnerres' ? this.s.plots.length : UP_BY_ID[id].max; }
     robotCost(id, n = this.s.robots[id] || 0) { const r = ROBOT_BY_ID[id]; return r.cost * Math.pow(r.g, n) * this.discount(); }
@@ -765,10 +772,12 @@
       if (!crop) return 0;
       const seed = SEED_BY_ID[crop.id];
       // Champignon sauvage : vaut un multiple de ta meilleure graine (pas la valeur d'un champignon d'une ère lointaine).
-      const base = crop.wild ? SEED_BY_ID[this.bestSeed()].value * D.EVENT_FX.wildMult : seed.value;
+      const base = crop.wild ? SEED_BY_ID[this.bestSeed()].value * D.EVENT_FX.wildMult : this.seedValue(seed);
       let v = base * this.valueMult() * this.harvestMult(seed, source) * this.fxValue(seed) * bonus * this.plotPlants(i);
       if (crop.rot) v *= 1 + 0.15 * this.tal('rotation');
       if (crop.energized > 0) { v *= D.STORM.energyMult * this.fxMul('energy'); this.addStat('energized'); this.emit('energy-harvest', { plot: i }); }
+      // Nouvel an chinois : une récolte sur 8 vaut ×8.
+      if (this.seasonDef() && this.seasonDef().lucky8 && (this.luckyN = (this.luckyN || 0) + 1) % 8 === 0) { v *= 8; this.emit('lucky8', { plot: i }); }
       if (crop.star) { v *= D.EVENT_FX.starMult; this.addStat('stars'); this.emit('star-harvest', { plot: i }); }
       const mutant = crop.mutant || null, M = mutant ? D.MUTATIONS[mutant] : null;
       if (M) {
@@ -792,6 +801,7 @@
       else this.earn(v);
       this.harvestBuckets[this.harvestBuckets.length - 1] += v;
       this.addStat('harvest');
+      if (seed.season) this.s.basket[seed.id] = (this.s.basket[seed.id] || 0) + this.plotPlants(i);
       this.petXp(D.PET_LEVEL.perHarvest);
       if (this.pm.gem && Math.random() < this.pm.gem.chance) {
         const gem = v * (this.pm.gem.mult - 1);
@@ -844,7 +854,8 @@
     setAllPlots(seed) { for (const pl of this.s.plots) pl.seed = seed; }
 
     goldChance(i) {
-      let c = 0.01 + this.pm.golden + this.fxAdd('gold');
+      const cr = this.s.plots[i].crop;
+      let c = 0.01 + this.pm.golden + this.fxAdd('gold') + (cr && SEED_BY_ID[cr.id].goldBonus || 0);
       if (this.ev && this.ev.timers.rainbow > 0) c *= 5;
       return c / this.plotPlants(i);
     }
@@ -856,7 +867,8 @@
     scareCrow(c) {
       if (c.state === 'leave') return;
       c.state = 'leave';
-      const reward = Math.max(5, this.harvestRate() * 15) * this.rewardMult();
+      const season = this.seasonDef();
+      const reward = Math.max(5, this.harvestRate() * 15) * this.rewardMult() * (season && season.crowReward || 1);
       this.earn(reward);
       this.addStat('crows');
       this.emit('crow-scared', { x: c.x, value: reward });
@@ -882,6 +894,7 @@
       this.bucketT += dt;
       if (this.bucketT >= 1) { this.bucketT -= 1; this.incomeBuckets.shift(); this.incomeBuckets.push(0); this.harvestBuckets.shift(); this.harvestBuckets.push(0); }
 
+      this.updateSeason(dt);
       this.updateWeather(dt);
       this.updateWeatherEffects(dt);
       this.updateEvents(dt);
@@ -936,7 +949,8 @@
       if (c.weatherT > 0) return;
       const ciel = 1 + 0.25 * this.perk('ciel');
       const entries = Object.entries(D.WEATHER).filter(([id]) => id !== c.weather);
-      const weights = entries.map(([, w]) => w.w * (w.rain ? ciel : 1) * (w.storm ? this.pm.stormMult : 1));
+      const sw = (this.seasonDef() && this.seasonDef().weather) || {};
+      const weights = entries.map(([id, w]) => w.w * (w.rain ? ciel : 1) * (w.storm ? this.pm.stormMult : 1) * (sw[id] || 1));
       let r = Math.random() * weights.reduce((a, b) => a + b, 0);
       let pick = entries[0][0];
       for (let i = 0; i < entries.length; i++) { r -= weights[i]; if (r <= 0) { pick = entries[i][0]; break; } }

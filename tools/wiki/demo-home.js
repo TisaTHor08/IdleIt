@@ -17,7 +17,13 @@
     for (let k = 0; k < 30; k++) for (const n of D.PETS.find(p => p.id === id).nodes) g.buyPetNode(pet, n.id);
     if (path) g.choosePath(pet, path);
   }
-  if (mode === 'factory') {
+  // Saison forcée (captures des habillages) : la moitié du champ en plantes de saison.
+  if (window.HOME_SEASON) {
+    g.forceSeason = window.HOME_SEASON; g.seasonT = 0; g.updateSeason(0);
+    const ss = g.seasonSeeds();
+    g.s.plots.forEach((pl, i) => { if (i % 2) { pl.seed = ss[(i >> 1) % ss.length].id; g.plant(i); if (pl.crop) pl.crop.p = 0.6 + (i % 4) / 10; } });
+  }
+    if (mode === 'factory') {
     for (const id of ['usine', 'trader_usine']) g.buy('up', id);
     for (const m of ['marmite', 'four', 'four', 'presse', 'sorbetiere', 'chocolaterie', 'alambic']) g.buy('machine', m);
     g.buy('frobot', 'porteur', 3); g.buy('fridge'); g.buy('fridge');

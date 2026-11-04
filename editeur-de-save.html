@@ -793,12 +793,34 @@
   };
   for (const f of PET_FOODS) for (const x of f.special) x.bal = (BAL[f.id] || {})[x.path || x.pet];
 
+
+  // Gamelles de saison : cuisinées seulement pendant leur fête, avec ses légumes exclusifs (panier de saison).
+  // Elles se gardent pour toujours, ont un effet très précis utile toute l'année et une contrepartie précise.
+  // Les retirer les détruit (lost: true).
+  const SEASON_FOODS = [
+    { id: 'gl_bonbon_potiron', season: 'halloween', name: 'Bonbon au potiron', ingredients: [{ seed: 'potiron', n: 12 }, { seed: 'herbe_sorciere', n: 6 }],
+      any: { desc: 'Chasseur de l’ombre : il chasse chaque corbeau aussitôt, et chacun rapporte 3× plus.', malus: 'il ne sort que la nuit : nuits 20% plus longues', mods: pm => ({ crowHunter: { delay: 0.1, reward: 3 }, nightSpeed: pm.nightSpeed * 0.8 }) } },
+    { id: 'gl_pain_epices', season: 'noel', name: 'Pain d’épices', ingredients: [{ seed: 'sapin', n: 4 }, { seed: 'houx', n: 10 }],
+      any: { desc: 'Marché de Noël permanent : le marchand ambulant paie ×4 et passe toutes les 4 min.', malus: 'il traîne le froid avec lui : toutes les plantes -10% de croissance', mods: pm => ({ cartMult: pm.cartMult * 4, growthAll: pm.growthAll * 0.9, powers: [...(pm.powers || []), { kind: 'cart', every: 240 }] }) } },
+    { id: 'gl_cotillon', season: 'nouvel_an', name: 'Gâteau des rois', ingredients: [{ seed: 'champagne', n: 8 }, { seed: 'gui', n: 8 }],
+      any: { desc: 'Fête sans fin : marché en folie 2.5× plus fréquent.', malus: 'lendemain de fête : fermier -20%', mods: pm => ({ frenzyFreq: pm.frenzyFreq * 2.5, farmerSpeed: pm.farmerSpeed * 0.8 }) } },
+    { id: 'gl_raviolis', season: 'nouvel_an_chinois', name: 'Raviolis porte-bonheur', ingredients: [{ seed: 'bambou', n: 20 }, { seed: 'pivoine', n: 3 }],
+      any: { desc: 'Porte-bonheur : +3% de légumes dorés.', malus: 'il offre des enveloppes rouges : tous les légumes -5%', mods: pm => ({ golden: pm.golden + 0.03, valueAll: pm.valueAll * 0.95 }) } },
+    { id: 'gl_chocolat_coeur', season: 'saint_valentin', name: 'Chocolat en cœur', ingredients: [{ seed: 'rose_valentin', n: 4 }, { seed: 'fraise_coeur', n: 10 }],
+      any: { desc: 'Âme sœur : +12% de doubles récoltes.', malus: 'il ne quitte plus le fermier : il ne chasse plus rien, et robots -5%', mods: pm => ({ double: pm.double + 0.12, crowHunter: null, chaseBoar: false, robotSpeed: pm.robotSpeed * 0.95 }) } },
+    { id: 'gl_oeuf_choco', season: 'paques', name: 'Œuf en chocolat', ingredients: [{ seed: 'carotte_doree', n: 10 }, { seed: 'tulipe', n: 6 }],
+      any: { desc: 'Pondeur d’or : toutes les 3 min, 3 plantes deviennent dorées.', malus: 'indigestion : 3% des récoltes perdues', mods: pm => ({ nothing: pm.nothing + 0.03, powers: [...(pm.powers || []), { kind: 'gold', every: 180, n: 3 }] }) } },
+    { id: 'gl_smoothie', season: 'fete_musique', name: 'Smoothie de festival', ingredients: [{ seed: 'calebasse', n: 8 }, { seed: 'lavande', n: 10 }],
+      any: { desc: 'En rythme : toutes les plantes +15% de croissance.', malus: 'trop de bruit : 50% de corbeaux en plus', mods: pm => ({ growthAll: pm.growthAll * 1.15, crowMult: pm.crowMult * 1.5 }) } },
+  ].map(f => ({ ...f, units: 0, special: [], lost: true }));
+  PET_FOODS.push(...SEASON_FOODS);
+
   // Effet final d'une gamelle sur un compagnon (espèce + voie) : { desc, relief, malus, mods(pm), special }.
   function foodEffect(petId, path, foodId) {
     const f = PET_FOODS.find(x => x.id === foodId);
     if (!f) return null;
     const x = f.special.find(s => s.path && s.path === path) || f.special.find(s => s.pet === petId);
-    if (!x) return { desc: f.any.desc, mods: f.any.mods, special: false };
+    if (!x) return { desc: f.any.desc, malus: f.any.malus || null, mods: f.any.mods, special: false, season: f.season || null };
     let extra = null, relief = null, malus = null;
     if (x.bal === 'R') { const r = RELIEF[path] || RELIEF[petId]; relief = r.text; extra = r.mods; }
     else if (Array.isArray(x.bal)) { const d = DRAWBACK[x.bal[0]](x.bal[1]); malus = d.text; extra = d.mods; }
@@ -1329,6 +1351,121 @@
     touristes: { name: 'Touristes', w: 3, good: true, dur: 40, when: 'day', desc: 'Des touristes cueillent les plantes mûres et les paient ×3 pendant 40 s.' },
     champignons_sauvages: { name: 'Champignons sauvages', w: 3, when: 'afterRain', good: true, desc: 'Après la pluie, des champignons poussent tout seuls sur les parcelles vides.' },
   };
+  // ---------- Saisons (fêtes) : 1,5 semaine avant et après la date (SEASON_DAYS), selon l'horloge de l'ordinateur ----------
+  // Chaque saison apporte 2 plantes spéciales (plantables seulement pendant la saison, leur valeur suit ta meilleure
+  // graine), un événement, des bonus et des modificateurs (fx génériques, mods des compagnons, météo, soldes...)
+  // et un habillage (décor, fermier, certains compagnons). Si deux saisons se chevauchent, la date la plus proche gagne.
+  const SEASON_DAYS = 10; // 1,5 semaine avant et après : 3 semaines en tout (21 jours)
+  // Pâques (calendrier grégorien, algorithme de Meeus/Jones/Butcher).
+  const easter = y => {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    return [Math.floor((h + l - 7 * m + 114) / 31), ((h + l - 7 * m + 114) % 31) + 1];
+  };
+  // Nouvel an chinois (calendrier luni-solaire) : table, puis une date moyenne au-delà.
+  const LUNAR_NY = { 2024: [2, 10], 2025: [1, 29], 2026: [2, 17], 2027: [2, 6], 2028: [1, 26], 2029: [2, 13], 2030: [2, 3], 2031: [1, 23], 2032: [2, 11],
+    2033: [1, 31], 2034: [2, 19], 2035: [2, 8], 2036: [1, 28], 2037: [2, 15], 2038: [2, 4], 2039: [1, 24], 2040: [2, 12] };
+  const SEASONS = [
+    {
+      id: 'nouvel_an', name: 'Nouvel an', date: () => [1, 1], color: '#ffd84a', accent: '#c77dff',
+      desc: 'Feux d’artifice, champagne et bonnes résolutions.',
+      boosts: ['Marché en folie 3× plus fréquent', 'Événements heureux 2× plus fréquents', 'Soldes de janvier : améliorations, robots et parcelles -15%'],
+      fx: [{ k: 'event', ev: 'good', mult: 2 }], mods: { frenzyFreq: 3 }, discount: 0.85,
+    },
+    {
+      id: 'nouvel_an_chinois', name: 'Nouvel an chinois', date: y => LUNAR_NY[y] || [2, 5], color: '#e0302a', accent: '#ffd84a',
+      desc: 'Lanternes rouges, enveloppes porte-bonheur et danse du dragon.',
+      boosts: ['Une récolte sur 8 vaut ×8 (le 8 porte chance)', 'Exotiques ×2, céréales ×1.5', '+0.8% de légumes dorés'],
+      fx: [{ k: 'gold', add: 0.008 }, { k: 'value', fam: 'exotique', mult: 2 }, { k: 'value', fam: 'cereale', mult: 1.5 }], lucky8: true,
+    },
+    {
+      id: 'saint_valentin', name: 'Saint-Valentin', date: () => [2, 14], color: '#ff4f7a', accent: '#ffc4e0',
+      desc: 'Des cœurs partout, des roses et Cupidon qui rôde.',
+      boosts: ['L’amour double tout : +10% de doubles récoltes', 'Baies et fleurs ×1.5', 'Compagnons +50% d’XP'],
+      fx: [{ k: 'value', fam: 'baie', mult: 1.5 }, { k: 'value', fam: 'fleur', mult: 1.5 }, { k: 'petXp', mult: 1.5 }], modsAdd: { double: 0.1 },
+    },
+    {
+      id: 'paques', name: 'Pâques', date: y => easter(y), color: '#ff8fd0', accent: '#9fe0a0',
+      desc: 'Printemps, fleurs et œufs cachés dans le champ.',
+      boosts: ['Fleurs ×2, racines ×1.5', 'Compagnons 2× plus d’XP, 2 poussins de plus', 'Pluies de printemps 2× plus fréquentes'],
+      fx: [{ k: 'value', fam: 'fleur', mult: 2 }, { k: 'value', fam: 'racine', mult: 1.5 }, { k: 'petXp', mult: 2 }], mods: { chicks: 2 }, weather: { pluie: 2 },
+    },
+    {
+      id: 'fete_musique', name: 'Fête de la musique', date: () => [6, 21], color: '#9a7bff', accent: '#7ee081',
+      desc: 'Concerts dans le champ : les robots dansent et les plantes poussent en rythme.',
+      boosts: ['Les robots dansent : +25%', 'Toutes les plantes +15% de croissance', 'Touristes 3× plus fréquents'],
+      fx: [{ k: 'robot', mult: 1.25 }, { k: 'growth', mult: 1.15 }, { k: 'event', ev: 'touristes', mult: 3 }],
+    },
+    {
+      id: 'halloween', name: 'Halloween', date: () => [10, 31], color: '#ff7a1e', accent: '#9a4bff',
+      desc: 'Potirons hantés, nuits interminables et corbeaux par nuées.',
+      boosts: ['Nuits 33% plus longues, mais les plantes y poussent 50% mieux', 'Champignons ×2, mythiques ×1.5', '2× plus de corbeaux, qui rapportent 3× plus'],
+      fx: [{ k: 'value', fam: 'champi', mult: 2 }, { k: 'value', fam: 'mythique', mult: 1.5 }, { k: 'night', mult: 1.5 }, { k: 'crow', mult: 2 }], mods: { nightSpeed: 0.75 }, crowReward: 3,
+    },
+    {
+      id: 'noel', name: 'Noël', date: () => [12, 25], color: '#e0302a', accent: '#9fe0a0',
+      desc: 'Neige, sapins et lutins mécaniques.',
+      boosts: ['Gel 4× plus fréquent (la neige)', 'Marché de Noël : le marchand paie ×3', 'Lutins : robots +20%, +1% de légumes dorés'],
+      fx: [{ k: 'robot', mult: 1.2 }, { k: 'gold', add: 0.01 }], mods: { cartMult: 3 }, weather: { gel: 4 },
+    },
+  ];
+  // Plantes de saison : valeur = meilleure graine débloquée × mult ; goldBonus = chance de doré en plus.
+  const SEASON_SEED_LIST = [
+    ['champagne', 'Raisin de champagne', 'nouvel_an', 'fruit', 'vine', '#4f8f3a', '#e8d27a', { mult: 2.5, grow: 30, desc: 'Il pétille : récolté, il vaut 2.5× ta meilleure graine.' }],
+    ['gui', 'Gui porte-bonheur', 'nouvel_an', 'fleur', 'bush', '#8fbf6a', '#f4f1ea', { mult: 1.2, grow: 14, goldBonus: 0.15, desc: 'Rapide, et 15% de chances d’être doré.' }],
+    ['bambou', 'Bambou', 'nouvel_an_chinois', 'exotique', 'stalk', '#5fae3a', '#9fe870', { mult: 0.8, grow: 6, desc: 'Pousse en un éclair : idéal pour la chance du 8.' }],
+    ['pivoine', 'Pivoine impériale', 'nouvel_an_chinois', 'fleur', 'flower', '#3f8a3a', '#e0302a', { mult: 4, grow: 60, desc: 'Lente, mais elle vaut 4× ta meilleure graine.' }],
+    ['rose_valentin', 'Rose de Saint-Valentin', 'saint_valentin', 'fleur', 'flower', '#3f8a3a', '#e0305a', { mult: 3, grow: 35, desc: 'Une rose rouge qui vaut 3× ta meilleure graine.' }],
+    ['fraise_coeur', 'Fraise en cœur', 'saint_valentin', 'baie', 'bush', '#4f9a3a', '#ff4f7a', { mult: 1.5, grow: 15, goldBonus: 0.1, desc: 'Rapide, et 10% de chances d’être dorée.' }],
+    ['tulipe', 'Tulipe de Pâques', 'paques', 'fleur', 'flower', '#4f9a3a', '#ff8fd0', { mult: 2, grow: 18, desc: 'Fleur de printemps (et les fleurs valent ×2 à Pâques).' }],
+    ['carotte_doree', 'Carotte du lapin', 'paques', 'racine', 'root', '#62c23f', '#ffd84a', { mult: 2.5, grow: 25, goldBonus: 0.1, desc: 'Le lapin en raffole : 10% de chances d’être dorée.' }],
+    ['calebasse', 'Calebasse musicale', 'fete_musique', 'fruit', 'ground', '#4f8a3a', '#e8b04a', { mult: 2.5, grow: 30, desc: 'On en fait des maracas : elle vaut 2.5× ta meilleure graine.' }],
+    ['lavande', 'Lavande d’été', 'fete_musique', 'fleur', 'flower', '#5a8a4a', '#9a7bff', { mult: 1.4, grow: 12, goldBonus: 0.05, desc: 'Rapide et parfumée.' }],
+    ['potiron', 'Potiron hanté', 'halloween', 'fruit', 'ground', '#3a5a2a', '#ff7a1e', { mult: 3, grow: 40, night: true, desc: 'Pousse la nuit, et vaut 3× ta meilleure graine.' }],
+    ['herbe_sorciere', 'Herbe de sorcière', 'halloween', 'champi', 'mandrake', '#5a2a7a', '#9fe870', { mult: 1.5, grow: 20, goldBonus: 0.2, desc: 'Ensorcelée : 20% de chances d’être dorée (et les champignons valent ×2).' }],
+    ['sapin', 'Sapin de Noël', 'noel', 'exotique', 'tree', '#1f6a3a', '#e0302a', { mult: 5, grow: 90, desc: 'Très lent, mais il vaut 5× ta meilleure graine.' }],
+    ['houx', 'Houx', 'noel', 'baie', 'bush', '#2f7a3a', '#e0302a', { mult: 1.5, grow: 12, desc: 'Rapide et décoratif.' }],
+  ];
+  const SEASON_SEEDS = SEASON_SEED_LIST.map(([id, name, season, fam, shape, leaf, fruit, o]) => ({
+    id, name, season, fam, shape, leaf, fruit, pr: 0, rank: 20, thirst: 1, unlock: 0, value: 0, shelf: FAMILIES[fam].shelf, ...o,
+  }));
+  // Saison active à une date (null hors saison) : { id, def, date, start, end }.
+  function seasonAt(now = new Date()) {
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let best = null;
+    for (const def of SEASONS) for (const y of [day.getFullYear() - 1, day.getFullYear(), day.getFullYear() + 1]) {
+      const [m, d] = def.date(y);
+      const at = new Date(y, m - 1, d);
+      const diff = Math.round((day - at) / 864e5);
+      if (Math.abs(diff) <= SEASON_DAYS && (!best || Math.abs(diff) < Math.abs(best.diff)))
+        best = { id: def.id, def, date: at, diff, start: new Date(y, m - 1, d - SEASON_DAYS), end: new Date(y, m - 1, d + SEASON_DAYS) };
+    }
+    return best;
+  }
+  // Prochaine date de chaque saison (pour le wiki).
+  function nextSeasonDates(now = new Date()) {
+    return SEASONS.map(def => {
+      for (const y of [now.getFullYear(), now.getFullYear() + 1]) {
+        const [m, d] = def.date(y);
+        const at = new Date(y, m - 1, d);
+        if (new Date(y, m - 1, d + SEASON_DAYS) >= now) return { id: def.id, date: at, start: new Date(y, m - 1, d - SEASON_DAYS), end: new Date(y, m - 1, d + SEASON_DAYS) };
+      }
+      return null;
+    });
+  }
+  // Événements de saison : une suite de pouvoirs (les mêmes que ceux des compagnons, voir petPower).
+  const SEASON_EVENTS = {
+    feu_artifice: { name: 'Feu d’artifice', season: 'nouvel_an', w: 6, good: true, desc: 'Un feu d’artifice illumine la ferme : le marché s’emballe et 3 plantes deviennent étoilées.', powers: [{ kind: 'frenzy' }, { kind: 'star', n: 3 }] },
+    danse_dragon: { name: 'Danse du dragon', season: 'nouvel_an_chinois', w: 6, good: true, desc: 'Le dragon de papier traverse le champ : tout mûrit sur son passage, et des enveloppes rouges tombent (2 min de revenus).', powers: [{ kind: 'boost', n: 1 }, { kind: 'money', secs: 120 }] },
+    cupidon: { name: 'Cupidon', season: 'saint_valentin', w: 6, good: true, desc: 'Cupidon tire ses flèches : 6 plantes mûrissent d’un coup, et 2 tombent amoureuses de l’or.', powers: [{ kind: 'ripen', n: 6 }, { kind: 'gold', n: 2 }] },
+    concert: { name: 'Concert au champ', season: 'fete_musique', w: 6, good: true, desc: 'Un concert éclate : toutes les plantes gagnent +50% de croissance et les touristes accourent.', powers: [{ kind: 'boost', n: 0.5 }, { kind: 'event', ev: 'touristes' }] },
+    chasse_oeufs: { name: 'Chasse aux œufs', season: 'paques', w: 6, good: true, desc: 'Des œufs dorés sont cachés dans le champ : 6 plantes deviennent dorées.', powers: [{ kind: 'gold', n: 6 }] },
+    sabbat: { name: 'Nuit des sorcières', season: 'halloween', w: 6, good: true, desc: 'Une éclipse tombe, les corbeaux se changent en légumes dorés et 2 plantes deviennent géantes.', powers: [{ kind: 'event', ev: 'eclipse' }, { kind: 'crowGold' }, { kind: 'giant', n: 2 }] },
+    traineau: { name: 'Traîneau du Père Noël', season: 'noel', w: 6, good: true, desc: 'Le traîneau passe : des cadeaux tombent (4 plantes dorées, 2 étoilées) et le marchand arrive.', powers: [{ kind: 'gold', n: 4 }, { kind: 'star', n: 2 }, { kind: 'cart' }] },
+  };
+
+  Object.assign(EVENTS, SEASON_EVENTS);
   const EVENT_FX = { wildMult: 4, starMult: 20, fairMult: 30, touristMult: 3, thiefSteal: 0.25, geeseBoost: 0.3, boarTrample: 0.4, locustEat: 0.08 };
 
   const count = (g, k) => g.s.stats[k] || 0;
@@ -1450,6 +1587,7 @@
     SEEDS, FAMILIES, ECO, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
     BRANCHES, FAST_GROW, TALENTS, SPEC_PENALTY, BIO, SCIENCE, PETS, PET_MOD_DEFAULTS, PET_LEVEL, MASTERY, PERKS, PERK_CATS,
     FACTORY, MACHINES, RECIPES, FACTORY_ROBOTS, PET_FOODS, foodEffect,
+    SEASONS, SEASON_SEEDS, SEASON_DAYS, seasonAt, nextSeasonDates,
     PRESTIGE, threshold, ACH_BONUS, WEATHER, DAY_LEN, EVENTS, EVENTS_EVERY, EVENT_FX, ACHIEVEMENTS, fmt, fmtTime,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DATA;

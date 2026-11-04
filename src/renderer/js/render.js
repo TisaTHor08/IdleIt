@@ -101,6 +101,7 @@
     // rafraîchi LAYER_HZ fois par seconde, et seuls les personnages et effets sont redessinés à chaque image.
     draw(dt) {
       if (!this.full) return;
+      S.setSeason(this.game.seasonId);
       if (this.layerT <= 0 || !this.layer) this.fitCanvas();
       const g = this.game, ctx = this.ctx, t = (this.t += dt);
       const fx = this.fieldX;
@@ -136,6 +137,7 @@
       this.drawActors(ctx, t, dt);
       ctx.restore();
 
+      if (g.seasonId) { ctx.save(); ctx.translate(fx, 0); S.drawSeasonFx(ctx, fieldEnd, GROUND, t); ctx.restore(); }
       this.drawWeather(dt, fx, fieldEnd);
       this.drawNight(dt, fx, fieldEnd);
       this.drawFloaters(dt, fx);
@@ -193,6 +195,7 @@
     drawField(ctx, t, n) {
       const g = this.game;
       S.drawBarn(ctx, 0, GROUND);
+      if (g.seasonId) { const xs = []; for (let i = 0; i < n; i++) xs.push(plotX(i)); S.drawSeasonDeco(ctx, 0, GROUND, xs); }
 
       // Parcelles et plantes
       for (let i = 0; i < n; i++) {

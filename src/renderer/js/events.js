@@ -17,6 +17,7 @@
       eventAllowed(id) {
         const c = this.s.clock, w = this.weather();
         if (id === 'touristes' && this.pm.noTourists) return false;
+        if (D.EVENTS[id].season && D.EVENTS[id].season !== this.seasonId) return false;
         switch (D.EVENTS[id].when) {
           case 'night': return this.isNight();
           case 'day': return !this.isNight();
@@ -81,7 +82,10 @@
             }
             break;
           }
-          default: return false;
+          default:
+            // Événements de saison : une suite de pouvoirs.
+            if (!E.powers) return false;
+            for (const pw of E.powers) this.petPower({ every: 1, ...pw }, { pm: {} }, null);
         }
         this.addStat('events');
         this.emit('event', { id });
@@ -258,7 +262,7 @@
           const c = this.s.plots[i].crop;
           if (!c || c.p < 1) continue;
           const sd = H.SEED_BY_ID[c.id];
-          const v = sd.value * this.plotPlants(i) * (c.gold ? 10 : 1) * (c.star ? X.starMult : 1) * (c.mutant === 'giant' ? 8 : 1);
+          const v = this.seedValue(sd) * this.plotPlants(i) * (c.gold ? 10 : 1) * (c.star ? X.starMult : 1) * (c.mutant === 'giant' ? 8 : 1);
           if (v > bestV) { bestV = v; best = i; }
         }
         if (best < 0) { this.emit('fair-none'); return; }

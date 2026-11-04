@@ -159,6 +159,26 @@ Avec le gestionnaire d'usine, tu peux **viser** une gamelle : il fait pousser le
 
 ![Nourriture](docs/img/pets-food.png)
 
+### Saisons et fêtes
+
+Sept fêtes changent la ferme pendant 3 semaines (10 jours avant et après la date, selon l'horloge de l'ordinateur) : **nouvel an**, **nouvel an chinois**, **Saint-Valentin**, **Pâques**, **fête de la musique**, **Halloween** et **Noël**. Quand deux fêtes se chevauchent, la plus proche l'emporte.
+
+- **2 plantes de saison**, plantables gratuitement pendant la fête (potiron hanté, sapin de Noël, pivoine impériale, rose de Saint-Valentin…). Leur valeur suit ta meilleure graine.
+- **Un événement** : nuit des sorcières, traîneau du Père Noël, feu d'artifice, danse du dragon, Cupidon, chasse aux œufs, concert au champ.
+- **Des bonus qui changent la meilleure stratégie** : nuits plus longues mais plus fertiles, une famille de légumes qui vaut 2× plus, une récolte sur 8 ×8, gel 4× plus fréquent, soldes de janvier…
+- **Une gamelle de saison**, cuisinée avec les deux légumes exclusifs (panier de saison). Elle se garde ensuite pour toujours, avec un effet très précis utile toute l'année et une contrepartie précise. La retirer la détruit.
+- **Un habillage** : décor de la ferme, tenue du fermier, couleurs de certains compagnons. Le site web change lui aussi de couleurs et de scène pendant les fêtes.
+
+| Fête | Plantes | Gamelle de saison |
+|---|---|---|
+| Nouvel an (1er janvier) | Raisin de champagne, gui | Gâteau des rois : marché en folie 2,5× plus fréquent, mais fermier -20 % |
+| Nouvel an chinois | Bambou, pivoine impériale | Raviolis porte-bonheur : +3 % de dorés, mais légumes -5 % |
+| Saint-Valentin (14 février) | Rose, fraise en cœur | Chocolat en cœur : +12 % de doubles récoltes, mais il ne chasse plus |
+| Pâques | Tulipe, carotte du lapin | Œuf en chocolat : 3 plantes dorées toutes les 3 min, mais 3 % de récoltes perdues |
+| Fête de la musique (21 juin) | Calebasse, lavande | Smoothie de festival : plantes +15 %, mais +50 % de corbeaux |
+| Halloween (31 octobre) | Potiron hanté, herbe de sorcière | Bonbon au potiron : chasse chaque corbeau (×3), mais nuits plus longues |
+| Noël (25 décembre) | Sapin, houx | Pain d'épices : marchand ×4 toutes les 4 min, mais plantes -10 % |
+
 ### Renaissance
 
 Une fois le **seuil** atteint (300 M$ gagnés dans la partie la première fois, environ ×10 à chaque renaissance), tu peux renaître : la ferme repart de zéro contre des **graines d'or**. Elles donnent +1 % de revenus chacune et s'échangent contre des **talents de renaissance** ciblés : argent et parcelles de départ, graine débloquée d'avance, robots d'une génération, une famille de légumes, la pluie, les événements heureux, les compagnons, le commerce…
@@ -255,6 +275,7 @@ node tools/test-market.js   # marché
 node tools/test-storm.js    # orages
 node tools/test-dense.js    # cultures denses et miniaturisation
 node tools/test-giant.js    # les 8 mutations
+node tools/test-seasons.js  # saisons : dates (Pâques, nouvel an chinois, chevauchements), plantes, événements, gamelles de saison
 node tools/test-factory.js  # usine, légumes dorés à part, gamelles (576 combinaisons compagnon × voie × gamelle), pouvoirs
 node tools/sim-life.js 200 20       # partie complète simulée : 20 renaissances, au plus 200 h
 npm run sim -- 6 50 bota+bio+trade  # une seule partie (branches, +trade = marché)
@@ -292,6 +313,7 @@ Presque tout se trouve dans [src/renderer/js/data.js](src/renderer/js/data.js) :
 | Mutation | `MUTATIONS` | `value`, `harvest`, `growth`, `fail`, `mold`, `infinite`, `catcher`, `good`. |
 | Succès | `ACHIEVEMENTS` | `check: g => …` (`g.s` = état sauvegardé). |
 | Usine | `FACTORY`, `MACHINES`, `RECIPES`, `FACTORY_ROBOTS`, améliorations `tab: 'usine'` | Prix en multiples de `FACTORY.base`. Recette : `inputs: [{ fam \| seed, n, gold }]`, `out`, `time`, `mult`, `shelf`. Logique dans [factory.js](src/renderer/js/factory.js), sprites `drawMachine` (un dessin par machine dans `MACHINE_DRAW`). |
+| Saison | `SEASONS`, `SEASON_SEED_LIST`, `SEASON_EVENTS`, `SEASON_FOODS` | `date(y) → [mois, jour]`, `fx`, `mods`/`modsAdd`, `weather`, `discount`, `lucky8`, `crowReward`. Habillage : `FARMER_SEASON_PAL`, `PET_SEASON_PAL`, `drawSeasonDeco`, `drawSeasonFx` (sprites.js). Logique : [seasons.js](src/renderer/js/seasons.js). Dans Node (tests, simulateur), pas de saison sauf `FARM_SEASON=<id>` ou `FARM_SEASON=auto`. |
 | Gamelle | `PET_FOODS` | `recipe`, `units`, effet `any` + `special: [{ pet \| path, desc, mods(pm) }]`. Les pouvoirs périodiques (`powers` : pluie, étoiles, dorés, maturation, plantation, événements…) sont exécutés par `petPower` de pets.js. |
 | Renaissance | `PRESTIGE` | Seuils `thresholds` (calibrés, ×1000 par renaissance au-delà), gain `gsBase × (gagné / seuil)^gsExp`, emplacements de compagnons. Les légumes d'une ère coûtent `ECO.eraMult` × le seuil précédent. |
 

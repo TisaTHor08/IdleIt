@@ -21,6 +21,7 @@ const DL_PAGE = REPO + '/releases/latest';
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const BY = list => Object.fromEntries(list.map(x => [x.id, x]));
 const SEED = BY(D.SEEDS), PET = BY(D.PETS), REC = BY(D.RECIPES), MACH = BY(D.MACHINES), FOOD = BY(D.PET_FOODS), UP = BY(D.UPGRADES), TAL = BY(D.TALENTS);
+const FACTORY_FOODS = D.PET_FOODS.filter(f => !f.season), SEASON_FOODS = D.PET_FOODS.filter(f => f.season);
 const PATH = {}; for (const p of D.PETS) for (const x of p.paths) PATH[x.id] = { ...x, pet: p.id };
 const pages = []; // { url, title }
 const search = [];
@@ -68,7 +69,7 @@ const NAV = [
   ['wiki/', 'Wiki'], ['guide/', 'Guide'], ['legumes/', 'Légumes'], ['compagnons/', 'Compagnons'], ['nourriture/', 'Nourriture'],
   ['combinaisons/', 'Combinaisons'], ['robots/', 'Robots'], ['ameliorations/', 'Améliorations'], ['specialisation/', 'Spécialisation'],
   ['usine/', 'Usine'], ['marche/', 'Marché'], ['evenements/', 'Météo et événements'], ['cultures/', 'Cultures et mutations'],
-  ['renaissance/', 'Renaissance'], ['succes/', 'Succès'], ['recherche/', 'Recherche'], ['editeur/', 'Éditeur de sauvegarde'], ['telecharger/', 'Télécharger'],
+  ['saisons/', 'Saisons'], ['renaissance/', 'Renaissance'], ['succes/', 'Succès'], ['recherche/', 'Recherche'], ['editeur/', 'Éditeur de sauvegarde'], ['telecharger/', 'Télécharger'],
 ];
 
 function page(url, { title, desc, crumbs = [], body, script = '', kind = '' }) {
@@ -90,13 +91,15 @@ function page(url, { title, desc, crumbs = [], body, script = '', kind = '' }) {
 <meta name="theme-color" content="#2c2014">
 ${SITE_URL ? `<link rel="canonical" href="${SITE_URL}/${url}">` : ''}
 <link rel="icon" href="${R}img/icon-seeds.png" type="image/png">
-<style>${CSS}</style>
+<script>${SEASON_SCRIPT}</script>
+<style>${CSS}${SEASON_CSS_WIKI}</style>
 </head>
 <body>
 <a class="skip" href="#contenu">Aller au contenu</a>
 <header class="top"><div class="in"><a class="brand" href="${R}"><img class="px" src="${R}img/logo.png" width="100" height="30" alt="Farmling"> Wiki</a>
 <input type="checkbox" id="menu" class="mt"><label for="menu" class="ml">Menu</label>
 <nav class="main" aria-label="Sections du wiki"><ul>${nav}</ul></nav></div></header>
+<p class="sbanner"><a href="${R}saisons/">Saison</a> · </p>
 <main id="contenu">${cr}${html}</main>
 <footer><div class="in">Wiki généré à partir des données du jeu, version ${esc(PKG.version)}. <a href="https://github.com/TisaTHor08/IdleIt">Code source et téléchargements</a>.</div></footer>
 ${script}
@@ -122,6 +125,34 @@ const upCost = (u, k) => u.base * Math.pow(u.g, k);
 const states = p => [{ id: null, name: 'Sans voie', look: 'base' }, ...p.paths.map(x => ({ id: x.id, name: x.name, look: x.id }))];
 const effectCell = e => `${e.special ? '<span class="tag g">spécial</span> ' : '<span class="tag">général</span> '}${esc(e.desc)}${e.relief ? ` <span class="ok">Contrepartie retirée : ${esc(e.relief)}.</span>` : ''}${e.malus ? ` <span class="bad">Contrepartie : ${esc(e.malus)}.</span>` : ''}`;
 const effectType = e => !e.special ? 'général' : e.bal === 'R' ? 'soulagement' : 'marché';
+
+
+// ---------- Saisons du site : habillage automatique selon la date du visiteur ----------
+// Petit script en ligne dans <head> (mêmes dates et même durée que le jeu, générées depuis data.js) :
+// il pose data-season sur <html> ; le CSS fait le reste (couleurs, bannière, scène de l'accueil).
+// ?saison=noel force une saison pour la prévisualiser.
+const SEASON_RULES = D.SEASONS.map(def => {
+  const dates = {};
+  for (let y = 2024; y <= 2040; y++) dates[y] = def.date(y);
+  return [def.id, dates];
+});
+const SEASON_SCRIPT = `(()=>{const R=${JSON.stringify(Object.fromEntries(SEASON_RULES))},N=${D.SEASON_DAYS},h=document.documentElement,q=new URLSearchParams(location.search).get('saison'),n=new Date(),t=new Date(n.getFullYear(),n.getMonth(),n.getDate());let b=null;for(const id in R)for(const y of[t.getFullYear()-1,t.getFullYear(),t.getFullYear()+1]){const md=R[id][y];if(!md)continue;const a=new Date(y,md[0]-1,md[1]),k=Math.round((t-a)/864e5);if((q?q===id&&y===t.getFullYear():Math.abs(k)<=N)&&(!b||Math.abs(k)<Math.abs(b[1])))b=[id,k,new Date(y,md[0]-1,md[1]+N)]}if(b){h.dataset.season=b[0];h.style.setProperty('--season-end','"'+(q?'aperçu':'jusqu’au '+b[2].toLocaleDateString('fr-FR',{day:'numeric',month:'long'}))+'"')}})()`;
+const SEASON_GRAD = {
+  nouvel_an: '#05040f 0%,#1a1440 45%,#4a2a7a 75%,#c77dff 100%', nouvel_an_chinois: '#2a0508 0%,#6a0f14 45%,#b5372f 75%,#ffb84a 100%',
+  saint_valentin: '#2a0a1a 0%,#5a1a3a 45%,#a0305a 75%,#ff8fb0 100%', paques: '#2a3a7a 0%,#4a5aa8 45%,#a06aa8 75%,#ff8fd0 100%',
+  fete_musique: '#0e0a2a 0%,#2a1a5a 45%,#4a3a9a 72%,#5fb548 100%', halloween: '#0e0818 0%,#2a1240 45%,#6a2a6a 72%,#ff7a1e 100%',
+  noel: '#0b1630 0%,#1d3a6a 50%,#4a6fa8 80%,#cfe0f4 100%',
+};
+const bannerText = def => `${def.name} à la ferme : ${def.boosts[0].charAt(0).toLowerCase() + def.boosts[0].slice(1)}… `;
+// CSS commun : bannière (cachée hors saison) et couleurs par saison.
+const SEASON_CSS_WIKI = `.sbanner{display:none;margin:0;padding:8px 16px;font-weight:600;color:#231a10;background:#fff3cc;border-bottom:3px solid var(--sc,#7a5600);text-align:center}.sbanner a{color:#231a10}
+${D.SEASONS.map(def => `[data-season=${def.id}]{--sc:${def.color}}[data-season=${def.id}] .sbanner{display:block}[data-season=${def.id}] .sbanner::before{content:${JSON.stringify(bannerText(def))}}[data-season=${def.id}] header.top{box-shadow:inset 0 -5px 0 ${def.color}}`).join('')}
+.sbanner::after{content:var(--season-end,"")}`;
+const SEASON_CSS_HOME = R => `.sbanner{display:none;max-width:720px;margin:0 auto 18px;padding:10px 16px;font-weight:700;color:#fdf6e3;background:#0b0714;border:4px solid var(--sc,#ffd84a);box-shadow:0 0 0 4px var(--edge)}
+.scene .sc{display:block;flex:none;width:3312px;height:120px;background:var(--scene) repeat-x;background-size:3312px 120px;image-rendering:pixelated}
+:root{--scene:url(${R}shots/scene-day.webp)}
+${D.SEASONS.map(def => `[data-season=${def.id}]{--sc:${def.color};--scene:url(${R}shots/scene-${def.id}.webp)}[data-season=${def.id}] .sbanner{display:block}[data-season=${def.id}] .sbanner::before{content:${JSON.stringify(bannerText(def))}}[data-season=${def.id}] .hero{background:radial-gradient(1.5px 1.5px at 12% 18%,#fff 98%,transparent),radial-gradient(1.5px 1.5px at 78% 12%,#fff 98%,transparent),radial-gradient(2px 2px at 40% 30%,#ffe9a8 98%,transparent),linear-gradient(${SEASON_GRAD[def.id]})}`).join('')}
+.sbanner::after{content:var(--season-end,"")}`;
 
 // ---------- Accueil ----------
 const counts = {
@@ -187,7 +218,8 @@ function downloadPage() {
 <meta name="theme-color" content="#140e24">
 ${SITE_URL ? `<link rel="canonical" href="${SITE_URL}/telecharger/">` : ''}
 <link rel="icon" href="${R}img/icon-seeds.png" type="image/png">
-<style>${HOME_CSS}.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;list-style:none;padding:0;margin:0}.dl .card{display:flex;flex-direction:column;gap:12px}.dl .card .btn{align-self:flex-start;margin-top:auto}.req{columns:2 280px;color:var(--soft)}.req li{margin-bottom:6px}</style>
+<script>${SEASON_SCRIPT}</script>
+<style>${HOME_CSS}${SEASON_CSS_HOME(R)}.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;list-style:none;padding:0;margin:0}.dl .card{display:flex;flex-direction:column;gap:12px}.dl .card .btn{align-self:flex-start;margin-top:auto}.req{columns:2 280px;color:var(--soft)}.req li{margin-bottom:6px}</style>
 </head>
 <body>
 <a class="skip" href="#contenu">Aller au contenu</a>
@@ -246,7 +278,8 @@ function homePage() {
 ${SITE_URL ? `<link rel="canonical" href="${SITE_URL}/"><meta property="og:image" content="${SITE_URL}/img/logo.png">` : ''}
 <link rel="icon" href="${R}img/icon-seeds.png" type="image/png">
 <link rel="preload" as="image" href="${R}img/logo.png" fetchpriority="high">
-<style>${HOME_CSS}</style>
+<script>${SEASON_SCRIPT}</script>
+<style>${HOME_CSS}${SEASON_CSS_HOME(R)}</style>
 </head>
 <body>
 <a class="skip" href="#contenu">Aller au contenu</a>
@@ -256,9 +289,10 @@ ${SITE_URL ? `<link rel="canonical" href="${SITE_URL}/"><meta property="og:image
 <div class="hero">
 <h1><img class="logo" src="${R}img/logo.png" width="${LOGO.w}" height="${LOGO.h}" alt="Farmling" fetchpriority="high"></h1>
 <p class="tag">La ferme idle en pixel art qui vit <b>au-dessus de ta barre des tâches</b>. Elle pousse pendant que tu travailles.</p>
+<p class="sbanner"></p>
 <div class="btns"><a class="btn" href="${DL}">▶ Télécharger pour Windows</a><a class="btn alt" href="${R}wiki/">Explorer le wiki</a></div>
 <p class="tag" style="font-size:.95rem;margin-top:-26px">Gratuit · installateur ~75 Mo · <a href="${R}telecharger/">version portable et détails</a></p>
-<div class="scene" aria-hidden="true"><div class="track">${scene('scene-day', 3312, '', false)}${scene('scene-day', 3312, '', false)}</div></div>
+<div class="scene" aria-hidden="true"><div class="track"><span class="sc"></span><span class="sc"></span></div></div>
 </div>
 <div class="ground" aria-hidden="true"></div>
 
@@ -357,7 +391,7 @@ ${facts([['Adoption', fmt(p.cost) + ' $'], ['Disponible', era(p.pr || 0)], ['Év
 <h2>Voies</h2><p>Une fois évolué et au niveau ${D.PET_LEVEL.max}, le compagnon choisit une voie, définitive jusqu’à la renaissance.</p>
 ${p.paths.map(x => `<div class="card"><h3 id="${x.id}">${petImg(R, p.id, x.id)} ${esc(x.name)}</h3><p>${esc(x.desc)}</p><p class="bad">${esc(x.malus)}</p></div>`).join('')}
 <h2>Nourriture</h2><p>L’effet de chaque <a href="${R}nourriture/">gamelle</a> selon l’état du compagnon. <span class="tag ok">soulagement</span> : effet modeste et la contrepartie actuelle disparaît. <span class="tag bad">marché</span> : effet fort et contrepartie nouvelle.</p>
-${table('Effets de la nourriture', ['Gamelle', ...st.map(s => esc(s.name))], D.PET_FOODS.map(f => [foodLink(R, f), ...st.map(s => effectCell(D.foodEffect(p.id, s.id, f.id)))]))}`,
+${table('Effets de la nourriture', ['Gamelle', ...st.map(s => esc(s.name))], D.PET_FOODS.filter(f => !f.season).map(f => [foodLink(R, f), ...st.map(s => effectCell(D.foodEffect(p.id, s.id, f.id)))]))}`,
   });
 }
 
@@ -365,9 +399,11 @@ ${table('Effets de la nourriture', ['Gamelle', ...st.map(s => esc(s.name))], D.P
 page('nourriture/', {
   title: 'Nourriture des compagnons', desc: `Les ${D.PET_FOODS.length} gamelles de Farmling : recette, quantité, effet général et effets spéciaux selon le compagnon et sa voie.`, crumbs: [['', 'Nourriture']], kind: 'Section',
   body: R => `<h1>Nourriture des compagnons</h1><p class="lead">Avec la cuisine pour animaux de l’<a href="${R}usine/">usine</a>, les produits du frigo deviennent des gamelles. Une gamelle coûte des produits et des frais (${D.FACTORY.foodFee} × la valeur des produits utilisés). Elle agit tant qu’elle est équipée ; retirée, son effet s’arrête et elle revient au placard. Les gamelles sont gardées à la renaissance.</p>
-${table('Gamelles', ['Gamelle', 'Recette', 'Quantité', 'Effet général', 'Effets spéciaux'], D.PET_FOODS.map(f => [foodLink(R, f), esc(REC[f.recipe].name), f.units, esc(f.any.desc), f.special.length]))}`,
+${table('Gamelles', ['Gamelle', 'Recette', 'Quantité', 'Effet général', 'Effets spéciaux'], D.PET_FOODS.filter(f => !f.season).map(f => [foodLink(R, f), esc(REC[f.recipe].name), f.units, esc(f.any.desc), f.special.length]))}
+<h2 id="saison">Gamelles de saison</h2><p>Elles se cuisinent seulement pendant leur <a href="${R}saisons/">fête</a>, avec les deux légumes qui n’y poussent qu’à ce moment-là, et se gardent ensuite pour toujours. Même effet pour tous les compagnons, utile toute l’année, avec une contrepartie précise. <b>Les retirer les détruit.</b></p>
+${table('Gamelles de saison', ['Gamelle', 'Fête', 'Ingrédients', 'Effet', 'Contrepartie'], SEASON_FOODS.map(f => [esc(f.name), `<a href="${R}saisons/#${f.season}">${esc(D.SEASONS.find(x => x.id === f.season).name)}</a>`, f.ingredients.map(i => `${i.n} ${esc(D.SEASON_SEEDS.find(x => x.id === i.seed).name)}`).join(' + '), esc(f.any.desc), `<span class="bad">${esc(f.any.malus)}</span>`]))}`,
 });
-for (const f of D.PET_FOODS) {
+for (const f of D.PET_FOODS.filter(x => !x.season)) {
   const r = REC[f.recipe];
   page(`nourriture/${f.id.replace(/^gl_/, '')}/`, {
     title: f.name, desc: `${f.name} (gamelle de Farmling) : ${f.units} × ${r.name}, son effet sur chacun des ${D.PETS.length} compagnons et chacune de leurs voies.`, crumbs: [['nourriture/', 'Nourriture'], ['', f.name]], kind: 'Gamelle',
@@ -384,7 +420,7 @@ page('combinaisons/', {
     const n = { R: 0, M: 0 };
     for (const f of D.PET_FOODS) for (const x of f.special) if (x.bal === 'R') n.R++; else n.M++;
     return `<h1>Toutes les combinaisons</h1><p class="lead">${counts.combos} combinaisons compagnon × état × gamelle, et un effet spécial pour chacune. ${counts.specials} effets différents : ${n.R} soulagements (effet modeste, la contrepartie disparaît) et ${n.M} marchés (effet fort, contrepartie nouvelle). Un effet propre à une voie passe avant celui de l’espèce.</p>
-${D.PET_FOODS.map(f => `<h2 id="${f.id}">${foodLink(R, f)}</h2>${table('Effets spéciaux : ' + f.name, ['Pour', 'Type', 'Effet'], f.special.map(x => {
+${D.PET_FOODS.filter(f => !f.season).map(f => `<h2 id="${f.id}">${foodLink(R, f)}</h2>${table('Effets spéciaux : ' + f.name, ['Pour', 'Type', 'Effet'], f.special.map(x => {
       const pet = x.path ? PATH[x.path].pet : x.pet;
       const shown = D.foodEffect(pet, x.path || null, f.id);
       return [x.path ? `${petImg(R, pet, x.path)} ${esc(PATH[x.path].name)} <span class="muted">(voie)</span>` : `${petImg(R, pet, 'base')} ${petLink(R, pet)}`, `<span class="tag ${x.bal === 'R' ? 'ok' : 'bad'}">${x.bal === 'R' ? 'soulagement' : 'marché'}</span>`, effectCell(shown)];
@@ -417,7 +453,7 @@ ${D.BRANCHES.map(b => `<h2 id="${b.id}">${esc(b.name)}</h2>${b.desc ? `<p>${esc(
 });
 
 // ---------- Usine ----------
-const foodsOf = r => D.PET_FOODS.filter(f => f.recipe === r.id);
+const foodsOf = r => FACTORY_FOODS.filter(f => f.recipe === r.id);
 page('usine/', {
   title: 'Usine de transformation', desc: `L'usine de Farmling : ${D.MACHINES.length} machines, ${D.RECIPES.length} recettes, robots d'usine, frigos, trader et gestionnaire.`, crumbs: [['', 'Usine']], kind: 'Section',
   body: R => `<div class="hero">${img(R, 'factory', 104, 88, 'L’usine', false)}<div><h1>Usine de transformation</h1><p class="lead">Disponible après ${D.FACTORY.pr} renaissances. Clique sur la grange pour passer à l’usine, sur l’usine pour revenir au champ. Les compagnons restent dans le champ.</p></div></div>
@@ -477,6 +513,32 @@ page('succes/', {
   body: R => `<h1>Succès</h1><p class="lead">${D.ACHIEVEMENTS.length} succès, chacun +${pct(D.ACH_BONUS)} de revenus.</p>${table('Succès', ['Succès', 'Condition'], D.ACHIEVEMENTS.map(a => [esc(a.name), esc(a.desc)]))}`,
 });
 
+
+// ---------- Saisons ----------
+const RULE = { nouvel_an: '1er janvier', nouvel_an_chinois: 'date lunaire (fin janvier à mi-février)', saint_valentin: '14 février', paques: 'dimanche de Pâques (date variable)', fete_musique: '21 juin', halloween: '31 octobre', noel: '25 décembre' };
+const dfmt = d => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+page('saisons/', {
+  title: 'Saisons et fêtes', desc: `Les ${D.SEASONS.length} saisons de Farmling (nouvel an, nouvel an chinois, Saint-Valentin, Pâques, fête de la musique, Halloween, Noël) : plantes spéciales, événements, bonus et habillage.`, crumbs: [['', 'Saisons']], kind: 'Section',
+  body: R => {
+    const now = new Date();
+    return `<h1>Saisons et fêtes</h1><p class="lead">Pendant ${D.SEASON_DAYS} jours avant et après chaque fête (3 semaines en tout), la ferme change : 2 plantes spéciales à planter gratuitement, un événement, des bonus qui changent la meilleure stratégie, et un habillage (décor, fermier, certains compagnons). Le jeu suit la date de l’ordinateur ; quand deux fêtes se chevauchent, la plus proche l’emporte. Ce site change aussi de couleurs pendant les fêtes.</p>
+${D.SEASONS.map(def => {
+      const seeds = D.SEASON_SEEDS.filter(x => x.season === def.id);
+      const ev = Object.values(D.EVENTS).find(e => e.season === def.id);
+      const next = [now.getFullYear(), now.getFullYear() + 1, now.getFullYear() + 2].map(y => { const [m, d] = def.date(y); return new Date(y, m - 1, d); }).filter(d => new Date(d.getFullYear(), d.getMonth(), d.getDate() + D.SEASON_DAYS) >= now).slice(0, 2);
+      return `<h2 id="${def.id}">${esc(def.name)}</h2><p>${esc(def.desc)} <span class="muted">${esc(RULE[def.id])} · prochaines éditions : ${next.map(d => `${dfmt(new Date(d.getFullYear(), d.getMonth(), d.getDate() - D.SEASON_DAYS))} → ${dfmt(new Date(d.getFullYear(), d.getMonth(), d.getDate() + D.SEASON_DAYS))}`).join(' ; ')}</span></p>
+<div class="tw" role="region" aria-label="Scène de ${esc(def.name)}" tabindex="0"><img class="px" src="${R}shots/scene-${def.id}.webp" width="3312" height="120" alt="La ferme pendant ${esc(def.name)}" loading="lazy" decoding="async" style="max-width:none;display:block"></div>
+<h3>Bonus et modificateurs</h3><ul>${def.boosts.map(b => `<li>${esc(b)}</li>`).join('')}</ul>
+<h3>Plantes de saison</h3>${table('Plantes de ' + def.name, ['Plante', 'Famille', 'Valeur', 'Pousse', 'Particularité'], seeds.map(x => [`<span id="${x.id}">${img(R, 'seed-' + x.id, 24, 36, '')} ${esc(x.name)}</span>`, esc(famName(x.fam)), `${x.mult}× ta meilleure graine`, time(x.grow), esc(x.desc)]))}
+${ev ? `<h3>Événement : ${esc(ev.name)}</h3><p>${esc(ev.desc)}</p>` : ''}
+${SEASON_FOODS.filter(f => f.season === def.id).map(f => `<h3>Gamelle de saison : ${esc(f.name)}</h3><p>${f.ingredients.map(i => `${i.n} ${esc(D.SEASON_SEEDS.find(x => x.id === i.seed).name)}`).join(' + ')}. ${esc(f.any.desc)} <span class="bad">Contrepartie : ${esc(f.any.malus)}.</span> Se garde après la fête ; la retirer la détruit.</p>`).join('')}`;
+    }).join('')}`;
+  },
+});
+for (const def of D.SEASONS) search.push({ t: def.name, u: `saisons/#${def.id}`, k: 'Saison' });
+for (const f of D.PET_FOODS.filter(x => x.season)) search.push({ t: f.name, u: 'nourriture/#saison', k: 'Gamelle de saison' });
+for (const x of D.SEASON_SEEDS) search.push({ t: x.name, u: `saisons/#${x.id}`, k: 'Plante de saison' });
+
 // ---------- Recherche ----------
 page('recherche/', {
   title: 'Recherche', desc: 'Rechercher un légume, un compagnon, une voie, une gamelle ou une page dans le wiki Farmling.', crumbs: [['', 'Recherche']],
@@ -512,11 +574,13 @@ function finish() {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Page introuvable · Farmling</title><meta name="description" content="Cette page de Farmling n’existe pas : un corbeau l’a mangée.">
 <meta name="robots" content="noindex"><meta name="theme-color" content="#140e24"><link rel="icon" href="/img/icon-seeds.png" type="image/png">
-<style>${HOME_CSS}.lost{text-align:center;padding:48px 16px 0}.lost .big{width:min(480px,80vw);height:auto}.lost p{max-width:560px;margin:16px auto 28px;font-size:1.15rem}.field{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin-top:24px}.field img{height:auto}</style>
+<script>${SEASON_SCRIPT}</script>
+<style>${HOME_CSS}${SEASON_CSS_HOME('/')}.lost{text-align:center;padding:48px 16px 0}.lost .big{width:min(480px,80vw);height:auto}.lost p{max-width:560px;margin:16px auto 28px;font-size:1.15rem}.field{display:flex;justify-content:center;align-items:flex-end;gap:6px;margin-top:24px}.field img{height:auto}</style>
 </head>
 <body>
 <header class="bar"><div class="in"><a class="brand" href="/" aria-label="Farmling, accueil"><img src="/img/logo.png" width="120" height="36" alt=""></a></div></header>
 <main class="hero lost">
+<p class="sbanner"></p>
 <h1><img class="big" src="/img/err404.png" width="480" height="288" alt="Erreur 404"></h1>
 <p><b>Un corbeau a mangé cette page !</b><br>Elle n’existe pas, ou plus. Le fermier replante tout de suite quelque chose d’autre.</p>
 <div class="btns"><a class="btn" href="/">▶ Retour à l’accueil</a><a class="btn alt" href="/wiki/">Ouvrir le wiki</a></div>

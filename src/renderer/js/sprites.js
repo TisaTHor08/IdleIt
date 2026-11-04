@@ -222,10 +222,108 @@
   // Compagnons qui volent (toujours, ou une fois évolués) : dessinés au-dessus du champ.
   const PET_FLY = { hibou: () => true, licorne: look => look !== 'base', dragon: look => look !== 'base' };
 
+
+  // ---------- Habillage des saisons ----------
+  let SEASON = null;
+  function setSeason(id) { SEASON = id || null; }
+  // Chapeau (et chemise) du fermier selon la saison.
+  const FARMER_SEASON_PAL = {
+    halloween: { ...FARMER_PAL, h: '#3a1e5a', H: '#1a0f2a', r: '#ff7a1e' },
+    noel: { ...FARMER_PAL, h: '#e0302a', H: '#f4f1ea', r: '#2f7a3a' },
+    nouvel_an: { ...FARMER_PAL, h: '#c77dff', H: '#ffd84a' },
+    paques: { ...FARMER_PAL, h: '#ffc4e0', H: '#ff8fd0', r: '#9fe0a0' },
+    nouvel_an_chinois: { ...FARMER_PAL, h: '#e0302a', H: '#ffd84a', r: '#ffd84a', b: '#b5372f' },
+    saint_valentin: { ...FARMER_PAL, h: '#ff4f7a', H: '#ffc4e0', r: '#e0305a' },
+    fete_musique: { ...FARMER_PAL, h: '#9a7bff', H: '#5a3a9a', r: '#7ee081' },
+  };
+  const farmerPal = () => (SEASON && FARMER_SEASON_PAL[SEASON]) || FARMER_PAL;
+  // Accessoires au-dessus du chapeau.
+  function drawFarmerHat(ctx, x, top, flip) {
+    if (SEASON === 'halloween') { px(ctx, x - 1, top - 2, 3, 2, '#3a1e5a'); px(ctx, x + (flip ? -2 : 1), top - 4, 2, 2, '#3a1e5a'); px(ctx, x - 2, top, 5, 1, '#ff7a1e'); }
+    else if (SEASON === 'noel') { px(ctx, x - 1, top - 1, 3, 1, '#e0302a'); px(ctx, x + (flip ? -3 : 2), top - 2, 2, 2, '#f4f1ea'); }
+    else if (SEASON === 'nouvel_an') { px(ctx, x - 1, top - 1, 3, 1, '#c77dff'); px(ctx, x, top - 3, 1, 2, '#ffd84a'); px(ctx, x, top - 4, 1, 1, '#ff7b6b'); }
+    else if (SEASON === 'paques') { px(ctx, x - 2, top - 4, 1, 4, '#f4f1ea'); px(ctx, x + 2, top - 4, 1, 4, '#f4f1ea'); px(ctx, x - 2, top - 3, 1, 2, '#ffc4e0'); px(ctx, x + 2, top - 3, 1, 2, '#ffc4e0'); }
+    else if (SEASON === 'nouvel_an_chinois') { px(ctx, x - 1, top - 1, 3, 1, '#ffd84a'); px(ctx, x, top - 2, 1, 1, '#e0302a'); }
+    else if (SEASON === 'saint_valentin') { px(ctx, x - 1, top - 3, 1, 1, '#ff4f7a'); px(ctx, x + 1, top - 3, 1, 1, '#ff4f7a'); px(ctx, x - 1, top - 2, 3, 1, '#ff4f7a'); px(ctx, x, top - 1, 1, 1, '#ff4f7a'); }
+    else if (SEASON === 'fete_musique') { px(ctx, x - 4, top + 1, 1, 3, '#2b1d14'); px(ctx, x + 4, top + 1, 1, 3, '#2b1d14'); px(ctx, x - 4, top, 9, 1, '#2b1d14'); px(ctx, x - 5, top + 2, 1, 2, '#9a7bff'); px(ctx, x + 5, top + 2, 1, 2, '#9a7bff'); }
+  }
+  // Palettes de saison de certains compagnons (clé = sprite).
+  const PET_SEASON_PAL = {
+    halloween: { chat: { k: '#121216', e: '#ff7a1e' }, maneki: { k: '#2a1e3a', e: '#ff7a1e' }, hibou: { b: '#4a2a5a', c: '#8a6aaa', y: '#ff7a1e', e: '#1a1a1a', o: '#e8a33a' } },
+    noel: { chien: { b: '#a8723c', d: '#6b4426', e: '#1a1a1a', n: '#e0302a' }, berger: { b: '#7a4a26', d: '#f2f2f2', e: '#1a1a1a', n: '#e0302a' } },
+    paques: { poussin: { y: '#ffc4e0', e: '#2b1d14', o: '#ff8fd0' }, renard: { o: '#f4f1ea', w: '#ffc4e0', e: '#1a1a1a', n: '#ff8fd0', d: '#c9a46b' } },
+    nouvel_an: { licorne: { w: '#ffffff', m: '#c77dff', g: '#ffd84a', e: '#3a2a6a' }, licorne_evo: { w: '#ffffff', m: '#ff8fd0', g: '#ffd84a', e: '#3a2a6a' } },
+    saint_valentin: { chat: { k: '#e8a0b8', e: '#e0305a' }, renard: { o: '#ff4f7a', w: '#ffc4e0', e: '#1a1a1a', n: '#1a1a1a', d: '#a0304a' } },
+    fete_musique: { hibou: { b: '#5a3a9a', c: '#c9b8e8', y: '#7ee081', e: '#1a1a1a', o: '#ffd84a' } },
+    nouvel_an_chinois: { dragon: { g: '#d9a52a', w: '#ff5e3a', y: '#fff3c4', e: '#e0302a' }, dragon_evo: { g: '#e0302a', w: '#ffd84a', y: '#fff3c4', e: '#ffd84a' } },
+  };
+  // Décor fixe (dans le calque du champ) : à côté de la grange et le long du champ.
+  function drawSeasonDeco(ctx, barnX, ground, plotXs) {
+    if (!SEASON) return;
+    const g = ground;
+    if (SEASON === 'halloween') {
+      for (const x of [barnX - 3, barnX + 23]) { px(ctx, x, g - 3, 4, 3, '#ff7a1e'); px(ctx, x + 1, g - 4, 1, 1, '#3a5a2a'); px(ctx, x + 1, g - 2, 1, 1, '#2b1d14'); px(ctx, x + 2, g - 2, 1, 1, '#2b1d14'); }
+      px(ctx, barnX + 1, g - 12, 1, 1, '#e9ecf5'); px(ctx, barnX + 2, g - 11, 1, 1, '#e9ecf5'); px(ctx, barnX + 1, g - 10, 2, 1, '#c9ced6');
+      plotXs.forEach((x, k) => { if (k % 5 === 2) { px(ctx, x - 1, g - 3, 3, 2, '#ff7a1e'); px(ctx, x, g - 4, 1, 1, '#3a5a2a'); } });
+    } else if (SEASON === 'noel') {
+      px(ctx, barnX, g - 14, 24, 1, '#ffffff'); for (let r = 0; r < 6; r++) px(ctx, barnX + 2 + r * 1.5, g - 14 - r, 3, 1, '#ffffff');
+      for (let i = 0; i < 22; i += 2) px(ctx, barnX + 1 + i, g - 12, 1, 1, ['#e0302a', '#ffd84a', '#7ee081', '#9fd8ff'][i / 2 % 4]);
+      plotXs.forEach(x => { px(ctx, x - 5, g - 3, 3, 1, '#ffffff'); px(ctx, x + 2, g - 3, 2, 1, '#f4f6fa'); });
+    } else if (SEASON === 'nouvel_an') {
+      for (let i = 0; i < 6; i++) { px(ctx, barnX + 2 + i * 4, g - 13, 2, 2, ['#c77dff', '#ffd84a', '#ff7b6b', '#7ee081', '#9fd8ff', '#ff8fd0'][i]); }
+      px(ctx, barnX + 1, g - 14, 23, 1, '#e8d27a');
+    } else if (SEASON === 'paques') {
+      const eggs = ['#ffc4e0', '#9fd8ff', '#fff3a8', '#c9b8e8', '#9fe0a0'];
+      plotXs.forEach((x, k) => { if (k % 3 === 1) { px(ctx, x + 6, g - 3, 2, 3, eggs[k % eggs.length]); px(ctx, x + 6, g - 2, 2, 1, '#ffffff'); } if (k % 3 === 0) { px(ctx, x - 7, g - 3, 1, 2, '#5fb548'); px(ctx, x - 7, g - 4, 1, 1, eggs[(k + 2) % eggs.length]); } });
+      px(ctx, barnX - 3, g - 3, 2, 3, '#ffc4e0'); px(ctx, barnX + 24, g - 3, 2, 3, '#9fd8ff');
+    } else if (SEASON === 'saint_valentin') {
+      const heart = (x, y, c) => { px(ctx, x, y, 1, 1, c); px(ctx, x + 2, y, 1, 1, c); px(ctx, x, y + 1, 3, 1, c); px(ctx, x + 1, y + 2, 1, 1, c); };
+      heart(barnX + 10, g - 20, '#ff4f7a'); heart(barnX + 2, g - 11, '#ffc4e0'); heart(barnX + 19, g - 11, '#ffc4e0');
+      plotXs.forEach((x, k) => { if (k % 4 === 1) heart(x + 5, g - 5, '#ff4f7a'); });
+    } else if (SEASON === 'fete_musique') {
+      for (const x of [barnX - 4, barnX + 24]) { px(ctx, x, g - 6, 4, 6, '#2b2b33'); px(ctx, x + 1, g - 5, 2, 2, '#5a5a66'); px(ctx, x + 1, g - 2, 2, 1, '#5a5a66'); }
+      for (let i = 0; i < 22; i += 3) px(ctx, barnX + 1 + i, g - 13, 2, 1, ['#9a7bff', '#7ee081', '#ffd84a', '#ff8fd0'][(i / 3) % 4]);
+    } else if (SEASON === 'nouvel_an_chinois') {
+      for (const x of [barnX + 3, barnX + 19]) { px(ctx, x, g - 13, 1, 2, '#2b1d14'); px(ctx, x - 1, g - 11, 3, 4, '#e0302a'); px(ctx, x - 1, g - 11, 3, 1, '#ffd84a'); px(ctx, x - 1, g - 8, 3, 1, '#ffd84a'); px(ctx, x, g - 7, 1, 1, '#ffd84a'); }
+      plotXs.forEach((x, k) => { if (k % 4 === 3) { px(ctx, x - 1, g - 4, 2, 3, '#e0302a'); px(ctx, x - 1, g - 3, 2, 1, '#ffd84a'); } });
+    }
+  }
+  // Animations de saison (à chaque image) : chauves-souris, neige, feux d'artifice, pétales, lanternes.
+  function drawSeasonFx(ctx, width, ground, t) {
+    if (!SEASON) return;
+    if (SEASON === 'halloween') {
+      for (let k = 0; k < 3; k++) {
+        const x = (t * (9 + k * 4) + k * 97) % (width + 20) - 10, y = 3 + k * 3 + Math.round(Math.sin(t * 3 + k) * 2), up = Math.floor(t * 8 + k) % 2;
+        px(ctx, x, y, 1, 1, '#1a0f2a'); px(ctx, x - 1, y - up, 1, 1, '#1a0f2a'); px(ctx, x + 1, y - up, 1, 1, '#1a0f2a');
+      }
+    } else if (SEASON === 'noel') {
+      for (let k = 0; k < width; k += 23) px(ctx, k + Math.round(Math.sin(t + k) * 2), (k * 7 + t * 5) % ground, 1, 1, '#ffffff');
+    } else if (SEASON === 'nouvel_an') {
+      const cycle = 3.2, k = Math.floor(t / cycle), p = (t % cycle) / 1.2;
+      if (p < 1) {
+        const cx = 40 + ((k * 137) % Math.max(1, width - 80)), cy = 5;
+        const col = ['#ffd84a', '#ff7b6b', '#c77dff', '#7ee081', '#9fd8ff'][k % 5];
+        ctx.globalAlpha = 1 - p;
+        for (let a = 0; a < 8; a++) px(ctx, cx + Math.cos(a * Math.PI / 4) * p * 6, cy + Math.sin(a * Math.PI / 4) * p * 4, 1, 1, col);
+        ctx.globalAlpha = 1;
+      }
+    } else if (SEASON === 'paques') {
+      for (let k = 0; k < 3; k++) { const x = (t * 6 + k * 150) % (width + 10), y = 6 + Math.round(Math.sin(t * 2 + k) * 3); px(ctx, x, y, 1, 1, '#ffc4e0'); px(ctx, x + 1, y - (Math.floor(t * 6) % 2), 1, 1, '#ffc4e0'); }
+    } else if (SEASON === 'saint_valentin') {
+      for (let k = 0; k < 4; k++) { const x = (k * 113 + t * 3) % (width + 10), y = ground - 6 - ((t * 5 + k * 7) % (ground - 4)); px(ctx, x, y, 1, 1, '#ff4f7a'); px(ctx, x + 2, y, 1, 1, '#ff4f7a'); px(ctx, x, y + 1, 3, 1, '#ff4f7a'); px(ctx, x + 1, y + 2, 1, 1, '#ff4f7a'); }
+    } else if (SEASON === 'fete_musique') {
+      // notes de musique qui montent au-dessus du champ
+      for (let k = 0; k < 5; k++) { const x = (k * 89) % Math.max(1, width), y = ground - 4 - ((t * 6 + k * 9) % (ground - 4)), c = ['#9a7bff', '#7ee081', '#ffd84a', '#ff8fd0', '#9fd8ff'][k]; px(ctx, x, y, 2, 1, c); px(ctx, x + 1, y - 3, 1, 3, c); px(ctx, x + 2, y - 3, 1, 1, c); }
+    } else if (SEASON === 'nouvel_an_chinois') {
+      for (let k = 0; k < width; k += 61) if (Math.floor(t * 2 + k) % 3 === 0) px(ctx, k + 10, (k * 3 + t * 4) % ground, 1, 1, '#ffd84a');
+    }
+  }
+
   function drawPetMap(ctx, key, x, bottom, flip, frame) {
     const sp = PET_SPRITES[key];
     const map = sp.maps[frame % sp.maps.length];
-    drawMap(ctx, map, sp.pal, x - (map[0].length >> 1), bottom, flip);
+    const over = SEASON && PET_SEASON_PAL[SEASON] && PET_SEASON_PAL[SEASON][key];
+    drawMap(ctx, map, over || sp.pal, x - (map[0].length >> 1), bottom, flip);
   }
 
   // e = { x, dir, anim, moving, kind }, id = compagnon, evo = évolué ?
@@ -252,6 +350,7 @@
       const key = look === 'base' ? 'chien' : look === 'evo' ? 'berger' : look;
       drawPetMap(ctx, key, x, ground - 2, flip, frame);
       if (look === 'saintbernard') px(ctx, x + (flip ? -2 : 1), ground - 5, 2, 2, '#8a5a33');
+      if (SEASON === 'noel') { const hx = x + (flip ? -3 : 2); px(ctx, hx, ground - 9, 1, 2, '#8a5a33'); px(ctx, hx + (flip ? -1 : 1), ground - 10, 1, 2, '#8a5a33'); px(ctx, hx - (flip ? -1 : 1), ground - 10, 1, 1, '#8a5a33'); }
     } else if (id === 'chat') {
       const sleeping = look !== 'cheshire' && !e.moving && Math.sin(e.anim * 0.3) > 0.6;
       const key = look === 'base' ? 'chat' : look === 'evo' ? 'maneki' : look;
@@ -445,11 +544,13 @@
     if (w.frozenT > 0) ctx.globalAlpha = 0.55;
 
     if (w.kind === 'farmer') {
-      if (acting) drawMap(ctx, FARMER_ACT, FARMER_PAL, left, ground + bob, flip);
+      const pal = farmerPal();
+      if (acting) drawMap(ctx, FARMER_ACT, pal, left, ground + bob, flip);
       else {
-        drawMap(ctx, FARMER_TOP, FARMER_PAL, left, ground - 2, flip);
-        drawMap(ctx, FARMER_LEGS[frame], FARMER_PAL, left, ground, flip);
+        drawMap(ctx, FARMER_TOP, pal, left, ground - 2, flip);
+        drawMap(ctx, FARMER_LEGS[frame], pal, left, ground, flip);
       }
+      if (SEASON) drawFarmerHat(ctx, x, ground - 2 - FARMER_TOP.length - 2 + (acting ? bob + 2 : 0), flip);
       if (acting) drawTool(ctx, w, x, ground, flip);
       if (w.state === 'sleep') drawText(ctx, Math.floor(t * 1.5) % 2 ? 'z' : 'Z', x + 3, ground - 18, '#e9ecf5', 'rgba(0,0,0,0.6)');
       return;
@@ -1015,5 +1116,5 @@
     return url;
   }
 
-  root.FARM_SPRITES = { px, drawMap, drawWorker, drawBarn, drawGrass, drawSoil, drawPlant, drawSparkle, drawCrow, drawCart, drawText, textWidth, iconURL, seedIconURL, petIconURL, robotIconURL, drawPet, drawHive, drawSilo, drawRod, drawEnergy, drawBolt, drawMutation, drawBoar, drawSwarm, drawThief, drawJudge, drawTornado, drawGeese, drawStarMark, drawFactory, drawSmoke, drawBelt, drawMachine, drawFridge, drawCrate, drawPorter, ICONS };
+  root.FARM_SPRITES = { px, drawMap, drawWorker, drawBarn, drawGrass, drawSoil, drawPlant, drawSparkle, drawCrow, drawCart, drawText, textWidth, iconURL, seedIconURL, petIconURL, robotIconURL, drawPet, drawHive, drawSilo, drawRod, drawEnergy, drawBolt, drawMutation, drawBoar, drawSwarm, drawThief, drawJudge, drawTornado, drawGeese, drawStarMark, setSeason, drawSeasonDeco, drawSeasonFx, drawFactory, drawSmoke, drawBelt, drawMachine, drawFridge, drawCrate, drawPorter, ICONS };
 })(this);
