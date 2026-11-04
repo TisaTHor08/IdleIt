@@ -6,6 +6,7 @@
   const H = 20;            // hauteur en pixels art
   const GROUND = H;        // les pieds touchent le bas de la fenêtre (haut de la barre des tâches)
   const SOIL_TOP = GROUND - 3;
+  const LAYER_HZ = 4;    // rafraîchissements du décor par seconde
 
   class Renderer {
     constructor(canvas, game) {
@@ -29,14 +30,12 @@
       this.scale = scale;
       const dpr = window.devicePixelRatio || 1;
       this.u = scale / dpr;
-      this.W = Math.ceil(window.innerWidth / this.u);
-      this.canvas.width = this.W;
-      this.canvas.height = H;
-      this.canvas.style.width = (this.W * this.u) + 'px';
-      this.canvas.style.height = (H * this.u) + 'px';
+      this.full = Math.ceil(window.innerWidth / this.u); // largeur disponible (place pour les parcelles)
+      this.W = 0;
+      this.fitCanvas();
       this.fieldX = Math.ceil(hudRightCss / this.u) + 3;
       // Une fois le marché débloqué, on garde de la place au bout du champ pour les silos.
-      const free = this.W - this.fieldX - LAYOUT.BARN_W - LAYOUT.PAD - 4 - (this.game.s.market.unlocked ? C.SILO.RESERVE : 0);
+      const free = this.full - this.fieldX - LAYOUT.BARN_W - LAYOUT.PAD - 4 - (this.game.s.market.unlocked ? C.SILO.RESERVE : 0);
       this.game.maxPlots = Math.max(D.PLOTS.start, Math.floor(free / LAYOUT.PLOT_STEP));
       this.ctx.imageSmoothingEnabled = false;
     }
@@ -46,6 +45,8 @@
       const g = this.game;
       const ax = cx / this.u - this.fieldX, ay = cy / this.u;
       if (ax < -2) return null;
+      if (g.view === 'factory') return this.hitFactory(ax, ay);
+      if (g.factoryUnlocked() && ax <= LAYOUT.BARN_W - 2 && ay >= H - 18) return { type: 'barn' };
       if (g.cart && !g.cart.done && ax >= g.cart.x - 3 && ax <= g.cart.x + 21 && ay >= H - 17) return { type: 'cart' };
       const ev = g.ev || {};
       if (ev.boar && !ev.boar.scared && Math.abs(ax - ev.boar.x) <= 6 && ay >= H - 9) return { type: 'boar' };
@@ -77,6 +78,17 @@
       return null;
     }
 
+    hitFactory(ax, ay) {
+      const g = this.game, F = D.FACTORY;
+      if (ax <= LAYOUT.BARN_W - 2 && ay >= H - 20) return { type: 'factory-exit' };
+      if (ay < H - 18) return null;
+      const fx = g.fridgeX();
+      if (g.s.factory.fridges && ax >= fx && ax <= fx + g.s.factory.fridges * 10) return { type: 'fridge' };
+      const ms = g.s.factory.machines;
+      for (let i = 0; i < ms.length; i++) if (Math.abs(ax - g.machineX(i)) <= F.slotStep / 2) return { type: 'machine', i };
+      return null;
+    }
+
     siloX0() { return plotX(Math.max(this.game.activePlots(), 1) - 1) + LAYOUT.PLOT_W / 2 + C.SILO.GAP; }
 
     addFloater(plotOrX, text, color, isX) {
@@ -85,15 +97,101 @@
       if (this.floaters.length > 60) this.floaters.shift();
     }
 
+    // Sobriété : le décor (grange, terre, plantes, silos) change lentement ; il est dessiné dans un calque
+    // rafraîchi LAYER_HZ fois par seconde, et seuls les personnages et effets sont redessinés à chaque image.
     draw(dt) {
+      if (!this.full) return;
+      if (this.layerT <= 0 || !this.layer) this.fitCanvas();
       const g = this.game, ctx = this.ctx, t = (this.t += dt);
       const fx = this.fieldX;
-      ctx.clearRect(0, 0, this.W, H);
-      ctx.save();
-      ctx.translate(fx, 0);
-
       const n = g.activePlots();
       const fieldEnd = plotX(Math.max(n, 1) - 1) + LAYOUT.PLOT_W / 2 + 4;
+      this.layerT = (this.layerT || 0) - dt;
+      if (!this.layer || this.layer.width !== this.W) { this.layer = document.createElement('canvas'); this.layer.width = this.W; this.layer.height = H; this.layerT = 0; }
+      if (this.layerT <= 0) {
+        this.layerT = 1 / LAYER_HZ;
+        const lc = this.layer.getContext('2d');
+        lc.clearRect(0, 0, this.W, H);
+        lc.save(); lc.translate(fx, 0);
+        if (g.view === 'factory') this.drawFactoryStatic(lc, t); else this.drawField(lc, t, n);
+        lc.restore();
+      }
+      ctx.clearRect(0, 0, this.W, H);
+      ctx.drawImage(this.layer, 0, 0);
+      ctx.save();
+      ctx.translate(fx, 0);
+      if (g.view === 'factory') {
+        this.drawFactoryActors(ctx, t);
+        ctx.restore();
+        this.drawNight(dt, fx, g.fridgeX());
+        this.drawFloaters(dt, fx);
+        return;
+      }
+      if (this.hover && this.hover.type === 'plot') {
+        const left = plotX(this.hover.i) - LAYOUT.PLOT_W / 2;
+        ctx.globalAlpha = 0.35;
+        S.px(ctx, left - 1, H - 15, LAYOUT.PLOT_W + 2, 15, g.brush ? '#9fe8ff' : '#ffffff');
+        ctx.globalAlpha = 1;
+      }
+      this.drawActors(ctx, t, dt);
+      ctx.restore();
+
+      this.drawWeather(dt, fx, fieldEnd);
+      this.drawNight(dt, fx, fieldEnd);
+      this.drawFloaters(dt, fx);
+    }
+
+    // ---------- Usine ----------
+    drawFactoryStatic(ctx, t) {
+      const g = this.game, f = g.s.factory, F = D.FACTORY;
+      S.drawFactory(ctx, 0, GROUND);
+      // Quai : caisses des silos
+      S.drawCrate(ctx, F.dockX - 3, GROUND - 3, '#7cae4a'); S.drawCrate(ctx, F.dockX, GROUND - 3, '#e8a33a'); S.drawCrate(ctx, F.dockX - 1, GROUND - 6, '#c0284a');
+      const fx = g.fridgeX();
+      S.drawBelt(ctx, F.dockX + 4, fx, GROUND, 0);
+      const cap = F.fridgeCap * (1 + 0.5 * g.lvl('frigo_xxl'));
+      let left = g.fridgeUnits();
+      for (let k = 0; k < f.fridges; k++) { S.drawFridge(ctx, fx + k * 10, GROUND, Math.min(1, left / cap)); left -= cap; }
+      if (!f.machines.length) S.drawText(ctx, 'usine vide', F.slot0 - 4, 4, '#e9ecf5', 'rgba(0,0,0,0.6)');
+    }
+
+    drawFactoryActors(ctx, t) {
+      const g = this.game, f = g.s.factory, F = D.FACTORY;
+      S.drawSmoke(ctx, 0, GROUND, t);
+      // Tapis qui défile, machines, produits, porteurs
+      const fx = g.fridgeX();
+      for (let x = F.dockX + 4 + (Math.floor(t * g.beltSpeed() / 2) % 4); x < fx; x += 4) S.px(ctx, x, GROUND - 3, 1, 1, '#9a9aa8');
+      f.machines.forEach((m, i) => {
+        const r = m.lot && C.RECIPE_BY_ID[m.lot.id];
+        S.drawMachine(ctx, m.type, g.machineX(i), GROUND, m.st === 2, t + i, m.st ? (m.st === 2 && r ? m.t / r.time : 0) : null, r && r.color);
+        if (this.hover && this.hover.type === 'machine' && this.hover.i === i) { ctx.globalAlpha = 0.25; S.px(ctx, g.machineX(i) - 8, H - 18, 17, 18, '#ffffff'); ctx.globalAlpha = 1; }
+      });
+      for (const it of g.belt || []) S.drawCrate(ctx, it.x, GROUND - 3, C.RECIPE_BY_ID[it.id].color);
+      for (const p of g.porterList()) { p.carryColor = p.carry && C.RECIPE_BY_ID[p.carry] ? C.RECIPE_BY_ID[p.carry].color : null; S.drawPorter(ctx, p, GROUND, t); }
+    }
+
+    // Sobriété : le canvas ne couvre que la partie dessinée (ferme, silos et une marge pour les visiteurs),
+    // pas tout l'écran : moins de pixels à composer à chaque image.
+    fitCanvas() {
+      const g = this.game;
+      const farmEnd = this.siloX0() + (g.s.trade.silos || 0) * C.SILO.STEP + 70;
+      const end = g.view === 'factory' ? Math.max(farmEnd, g.fridgeX() + g.s.factory.fridges * 10 + 20) : farmEnd;
+      const want = Math.min(this.full, Math.ceil((this.fieldX + end) / 32) * 32);
+      if (want === this.W) return;
+      this.W = want;
+      this.canvas.width = this.W;
+      this.canvas.height = H;
+      this.canvas.style.width = (this.W * this.u) + 'px';
+      this.canvas.style.height = (H * this.u) + 'px';
+      this.ctx.imageSmoothingEnabled = false;
+      this.layer = null;
+    }
+
+    // Force le prochain rendu du décor (clic, achat...).
+    dirty() { this.layerT = 0; }
+
+    drawField(ctx, t, n) {
+      const g = this.game;
       S.drawBarn(ctx, 0, GROUND);
 
       // Parcelles et plantes
@@ -136,13 +234,6 @@
         if (pl.seed !== 'auto' && g.seedFor(i) !== (pl.crop ? pl.crop.id : g.seedFor(i))) S.px(ctx, left + LAYOUT.PLOT_W - 1, GROUND - 1, 1, 1, '#ffffff');
       }
 
-      if (this.hover && this.hover.type === 'plot') {
-        const left = plotX(this.hover.i) - LAYOUT.PLOT_W / 2;
-        ctx.globalAlpha = 0.35;
-        S.px(ctx, left - 1, H - 15, LAYOUT.PLOT_W + 2, 15, g.brush ? '#9fe8ff' : '#ffffff');
-        ctx.globalAlpha = 1;
-      }
-
       if (g.s.trade.silos) {
         // Le stock est commun : on remplit les silos l'un après l'autre.
         const cap = g.siloCapacity() / g.s.trade.silos;
@@ -153,6 +244,10 @@
           S.drawSilo(ctx, this.siloX0() + k * C.SILO.STEP, GROUND, fill, t);
         }
       }
+    }
+
+    drawActors(ctx, t, dt) {
+      const g = this.game;
       if (g.cart) S.drawCart(ctx, g.cart, GROUND);
       for (const c of g.crows) S.drawCrow(ctx, c, GROUND);
       // Les robots d'abord, le fermier par-dessus, les drones tout en haut.
@@ -189,14 +284,9 @@
         if (ev.geese) S.drawGeese(ctx, ev.geese, t);
       }
       this.drawFx(dt);
-      ctx.restore();
-
-      this.drawWeather(dt, fx, fieldEnd);
-      this.drawNight(dt, fx, fieldEnd);
-      this.drawFloaters(dt, fx);
     }
 
-    addFx(type, x) { this.fx.push({ type, x, t: 0 }); }
+    addFx(type, x, x2) { this.fx.push({ type, x, x2, t: 0 }); }
 
     drawFx(dt) {
       const ctx = this.ctx;
@@ -226,6 +316,10 @@
           const sx = f.x + 40 * (1 - k), sy = -2 + (GROUND - 14) * k;
           for (let j = 0; j < 6; j++) { ctx.globalAlpha = 1 - j / 6; S.px(ctx, sx + j * 2, sy - j, 1, 1, '#fff3a0'); }
           ctx.globalAlpha = 1;
+        } else if (f.type === 'sweep') {
+          // Ver cosmique : il file d'un bout à l'autre du champ
+          const head = f.x + (f.x2 - f.x) * Math.min(1, f.t / 1.4);
+          for (let k = 0; k < 14; k++) S.px(ctx, head - k * 3, GROUND - 2 - Math.round(Math.abs(Math.sin(k * 0.7 + f.t * 10)) * 3), 3, 2, k % 3 ? '#9a7bff' : '#ffe14d');
         } else if (f.type === 'puff') {
           ctx.globalAlpha = Math.max(0, 1 - f.t / 0.8);
           for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; S.px(ctx, f.x + Math.cos(a) * f.t * 10, GROUND - 6 + Math.sin(a) * f.t * 5, 1, 1, '#ff9ad5'); }

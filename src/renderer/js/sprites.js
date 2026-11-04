@@ -5,8 +5,34 @@
 
   function px(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
 
+  // Sobriété : chaque sprite n'est dessiné pixel par pixel qu'une fois, dans une petite image réutilisée ensuite
+  // (un drawImage au lieu de dizaines de fillRect par image).
+  const newCanvas = (w, h) => {
+    if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; return c;
+  };
+  const canCache = typeof document !== 'undefined' || typeof OffscreenCanvas !== 'undefined';
+  const mapCache = new WeakMap(); // carte -> palette -> [image, image retournée]
+
   // Dessine une carte ['..ab..', ...] avec son coin bas-gauche en (x, bottom).
   function drawMap(ctx, map, pal, x, bottom, flip) {
+    if (canCache) {
+      let byPal = mapCache.get(map);
+      if (!byPal) mapCache.set(map, byPal = new WeakMap());
+      let imgs = byPal.get(pal);
+      if (!imgs) byPal.set(pal, imgs = []);
+      const k = flip ? 1 : 0;
+      if (!imgs[k]) {
+        const c = newCanvas(map[0].length, map.length);
+        drawMapRaw(c.getContext('2d'), map, pal, 0, map.length, flip);
+        imgs[k] = c;
+      }
+      ctx.drawImage(imgs[k], Math.round(x), Math.round(bottom) - map.length);
+      return;
+    }
+    drawMapRaw(ctx, map, pal, x, bottom, flip);
+  }
+  function drawMapRaw(ctx, map, pal, x, bottom, flip) {
     const h = map.length, w = map[0].length;
     const top = Math.round(bottom) - h;
     x = Math.round(x);
@@ -347,8 +373,9 @@
     drawMap(ctx, THIEF[Math.floor(th.anim * 6) % 2], THIEF_PAL, th.x - 4, ground, !th.fleeing);
   }
   const JUDGE = ['..hhh...', '.hhhhh..', '..sss...', '..sss.c.', '.rrrrrc.', '.rrrrr..', '..r.r...', '.kk.kk..'];
+  const JUDGE_PAL = { h: '#1d1d26', s: '#f2c193', r: '#7d3fc4', c: '#f2efe6', k: '#2b1d14' };
   function drawJudge(ctx, j, ground) {
-    drawMap(ctx, JUDGE, { h: '#1d1d26', s: '#f2c193', r: '#7d3fc4', c: '#f2efe6', k: '#2b1d14' }, j.x - 4, ground, false);
+    drawMap(ctx, JUDGE, JUDGE_PAL, j.x - 4, ground, false);
   }
   function drawTornado(ctx, tor, ground, t) {
     for (let k = 0; k < 18; k++) {
@@ -499,7 +526,13 @@
   }
 
   // ---------- Décor ----------
+  let barnImg = null;
   function drawBarn(ctx, x, ground) {
+    if (!canCache) return drawBarnRaw(ctx, x, ground);
+    if (!barnImg) { barnImg = newCanvas(26, 20); drawBarnRaw(barnImg.getContext('2d'), 0, 20); }
+    ctx.drawImage(barnImg, Math.round(x), Math.round(ground) - 20);
+  }
+  function drawBarnRaw(ctx, x, ground) {
     const g = ground;
     px(ctx, x + 1, g - 12, 22, 12, '#b5372f');          // murs
     for (let i = 0; i < 22; i += 3) px(ctx, x + 1 + i, g - 12, 1, 12, '#9c2c25');
@@ -520,13 +553,104 @@
     for (let i = 0; i < w; i += 5) px(ctx, x + i + ((i * 7) % 3), ground - 2, 1, 1, '#5fb548');
   }
 
-  function drawSoil(ctx, x, ground, w, moist, irrigated) {
-    const dry = [138, 90, 51], wet = [84, 52, 30];
-    const m = Math.max(0, Math.min(1, moist));
+  const SOIL_LEVELS = 8;
+  const SOIL_COLORS = Array.from({ length: SOIL_LEVELS + 1 }, (_, k) => {
+    const dry = [138, 90, 51], wet = [84, 52, 30], m = k / SOIL_LEVELS;
     const c = dry.map((v, i) => Math.round(v + (wet[i] - v) * m));
-    px(ctx, x, ground - 2, w, 2, `rgb(${c[0]},${c[1]},${c[2]})`);
-    px(ctx, x + 1, ground - 3, w - 2, 1, `rgb(${c[0] + 10},${c[1] + 8},${c[2] + 5})`);
+    return [`rgb(${c[0]},${c[1]},${c[2]})`, `rgb(${c[0] + 10},${c[1] + 8},${c[2] + 5})`];
+  });
+  function drawSoil(ctx, x, ground, w, moist, irrigated) {
+    const c = SOIL_COLORS[Math.round(Math.max(0, Math.min(1, moist)) * SOIL_LEVELS)];
+    px(ctx, x, ground - 2, w, 2, c[0]);
+    px(ctx, x + 1, ground - 3, w - 2, 1, c[1]);
     if (irrigated) { px(ctx, x - 1, ground - 2, 1, 2, '#7d8893'); px(ctx, x - 1, ground - 3, 1, 1, '#9fd8ff'); }
+  }
+
+  // ---------- Usine ----------
+  let factoryImg = null;
+  function drawFactory(ctx, x, ground) {
+    if (!factoryImg) {
+      factoryImg = newCanvas(26, 20);
+      const c = factoryImg.getContext('2d'), g = 20;
+      px(c, 1, g - 12, 22, 12, '#7d8893');                 // murs
+      for (let r = 0; r < 12; r += 3) for (let i = (r / 3) % 2 ? 0 : 2; i < 22; i += 4) px(c, 1 + i, g - 12 + r, 3, 1, '#6b7580');
+      for (let k = 0; k < 3; k++) { px(c, 1 + k * 7, g - 15, 7, 3, '#5a636d'); px(c, 1 + k * 7, g - 15, 1, 3, '#4a525c'); } // toit en dents de scie
+      px(c, 17, g - 20, 3, 6, '#5a636d');                   // cheminée
+      px(c, 8, g - 8, 8, 8, '#3a3a44');                     // porte de quai
+      for (let i = 0; i < 4; i++) px(c, 8, g - 8 + i * 2, 8, 1, '#4a4a56');
+      px(c, 3, g - 10, 3, 2, '#9fd8ff'); px(c, 18, g - 10, 3, 2, '#9fd8ff');
+    }
+    ctx.drawImage(factoryImg, Math.round(x), Math.round(ground) - 20);
+  }
+  function drawSmoke(ctx, x, ground, t) {
+    ctx.globalAlpha = 0.5;
+    for (let k = 0; k < 3; k++) {
+      const p = (t * 0.6 + k / 3) % 1;
+      px(ctx, x + 18 + Math.sin(p * 6 + k) * 1.5, ground - 21 - p * 8, 2, 2, '#c9ced6');
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawBelt(ctx, x0, x1, ground, t) {
+    px(ctx, x0, ground - 3, x1 - x0, 1, '#3a3a44');
+    px(ctx, x0, ground - 2, x1 - x0, 1, '#22222a');
+    for (let x = x0 + (Math.floor(t * 6) % 4); x < x1; x += 4) px(ctx, x, ground - 3, 1, 1, '#6b6b78');
+    for (let x = x0 + 2; x < x1; x += 9) px(ctx, x, ground - 1, 1, 1, '#22222a');
+  }
+  const MACHINE_DRAW = {
+    marmite: (c, x, g, on, t) => {
+      px(c, x - 4, g - 6, 9, 4, '#3a3a44'); px(c, x - 5, g - 7, 11, 1, '#5a5a66'); px(c, x - 3, g - 2, 1, 2, '#3a3a44'); px(c, x + 3, g - 2, 1, 2, '#3a3a44');
+      if (on) for (let k = 0; k < 3; k++) px(c, x - 2 + k * 2, g - 2 + (Math.floor(t * 8 + k) % 2), 1, 1, k % 2 ? '#ffd84a' : '#ff7a1e');
+    },
+    four: (c, x, g, on) => {
+      px(c, x - 5, g - 9, 11, 9, '#b5372f'); px(c, x - 4, g - 10, 9, 1, '#b5372f'); px(c, x - 3, g - 11, 7, 1, '#9c2c25');
+      px(c, x - 2, g - 5, 5, 4, on ? '#ff9a3c' : '#2b1d14'); px(c, x + 3, g - 13, 2, 3, '#5a636d');
+    },
+    presse: (c, x, g, on, t) => {
+      px(c, x - 5, g - 12, 1, 12, '#8a5a33'); px(c, x + 5, g - 12, 1, 12, '#8a5a33'); px(c, x - 5, g - 12, 11, 1, '#6b4426');
+      const y = on ? Math.round(Math.abs(Math.sin(t * 2)) * 3) : 0;
+      px(c, x, g - 11, 1, 3 + y, '#c9d1d9'); px(c, x - 3, g - 8 + y, 7, 1, '#8f99a4'); px(c, x - 3, g - 3, 7, 3, '#6b4426');
+    },
+    sorbetiere: (c, x, g, on, t) => {
+      px(c, x - 3, g - 9, 7, 9, '#e9ecf5'); px(c, x - 3, g - 9, 7, 1, '#9fd8ff'); px(c, x - 2, g - 6, 5, 3, '#bfe8ff');
+      const a = on ? Math.floor(t * 6) % 4 : 0;
+      px(c, x + 4, g - 10 + (a % 2), 2, 1, '#8f99a4');
+    },
+    chocolaterie: (c, x, g, on) => {
+      px(c, x - 5, g - 8, 11, 8, '#6b3a1e'); px(c, x - 5, g - 8, 11, 1, '#8a5a33');
+      px(c, x + 2, g - 12, 1, 4, '#c87533'); px(c, x + 2, g - 12, 3, 1, '#c87533');
+      if (on) px(c, x - 3, g - 5, 4, 2, '#3a1e10');
+    },
+    alambic: (c, x, g, on, t) => {
+      px(c, x - 4, g - 6, 6, 6, '#c87533'); px(c, x - 3, g - 8, 4, 2, '#d98a4a'); px(c, x - 2, g - 10, 2, 2, '#c87533');
+      px(c, x, g - 10, 4, 1, '#c87533'); for (let k = 0; k < 4; k++) px(c, x + 4 - (k % 2), g - 9 + k * 2, 2, 1, '#a8602a');
+      if (on && Math.floor(t * 3) % 2) px(c, x + 5, g - 1, 1, 1, '#7fe3ff');
+    },
+  };
+  function drawMachine(ctx, type, x, ground, on, t, progress, color) {
+    (MACHINE_DRAW[type] || MACHINE_DRAW.marmite)(ctx, Math.round(x), ground - 3, on, t);
+    if (progress != null) {
+      px(ctx, x - 4, ground - 18, 9, 1, '#22222a');
+      px(ctx, x - 4, ground - 18, Math.max(1, Math.round(9 * Math.min(1, progress))), 1, color || '#7ee081');
+    }
+    if (on && Math.floor(t * 2 + x) % 3 === 0) { ctx.globalAlpha = 0.5; px(ctx, x - 1 + (Math.floor(t * 3) % 3), ground - 16 - (Math.floor(t * 4) % 3), 1, 1, '#e9ecf5'); ctx.globalAlpha = 1; }
+  }
+  function drawFridge(ctx, x, ground, fill) {
+    px(ctx, x, ground - 14, 8, 14, '#e9ecf5'); px(ctx, x, ground - 14, 8, 1, '#ffffff');
+    px(ctx, x, ground - 9, 8, 1, '#aeb7c1'); px(ctx, x + 6, ground - 12, 1, 2, '#8f99a4'); px(ctx, x + 6, ground - 7, 1, 3, '#8f99a4');
+    const h = Math.round(12 * Math.max(0, Math.min(1, fill)));
+    if (h) px(ctx, x + 1, ground - 1 - h, 1, h, fill > 0.9 ? '#ff7b6b' : '#7ee081');
+  }
+  function drawCrate(ctx, x, y, color) {
+    px(ctx, x - 1, y - 3, 3, 3, '#8a5a33'); px(ctx, x, y - 2, 1, 1, color);
+  }
+  const PORTER_PAL = { b: '#8f99a4', d: '#5a636d', e: '#9fe8ff', k: '#3a3a44' };
+  const PORTER = [['.bbb.', '.beb.', 'ddddd', '.ddd.', '.k.k.'], ['.bbb.', '.beb.', 'ddddd', '.ddd.', 'k...k']];
+  const WORKER_PAL = { h: '#e8c15a', s: '#f1c193', b: '#4c7bd1', k: '#3a3a44' };
+  const WORKER = [['.hhh.', '.sss.', 'bbbbb', '.bbb.', '.k.k.'], ['.hhh.', '.sss.', 'bbbbb', '.bbb.', 'k...k']];
+  function drawPorter(ctx, p, ground, t) {
+    const frame = p.moving ? Math.floor(t * 8) % 2 : 0;
+    drawMap(ctx, p.robot ? PORTER[frame] : WORKER[frame], p.robot ? PORTER_PAL : WORKER_PAL, p.x - 2, ground, p.dir < 0);
+    if (p.carry) drawCrate(ctx, p.x + (p.dir < 0 ? -1 : 1), ground - 5, p.carryColor || '#e8a33a');
   }
 
   // ---------- Plantes ----------
@@ -538,8 +662,30 @@
     return `rgb(${r},${g},${b})`;
   }
 
-  // cx = centre, gy = sol (haut de la butte), g = croissance 0..1
+  // Plantes en cache : une image par (graine, dorée, stade de pousse en 24 pas, phase d'animation).
+  const PLANT_W = 40, PLANT_H = 40, PLANT_OX = 20, PLANT_OY = 32, PLANT_STEPS = 24, PLANT_MAX = 800;
+  const plantCache = new Map();
   function drawPlant(ctx, seed, cx, gy, g, gold, t) {
+    if (!canCache) return drawPlantRaw(ctx, seed, cx, gy, g, gold, t);
+    const q = g >= 1 ? PLANT_STEPS : Math.max(0, Math.floor(g * PLANT_STEPS));
+    cx = Math.round(cx);
+    // Seules deux formes bougent : l'étincelle du chou cosmique et la lueur du champignon du vide.
+    let ph = 0, tt = 0;
+    if (seed.shape === 'cosmic') { ph = ((Math.floor(t * 4 + cx) % 4) + 4) % 4; tt = ph / 4 + 0.01; }
+    else if (seed.id === 'vide' && g >= 1) { ph = Math.floor(t * 3) % 7; tt = ph / 3 + 0.01; }
+    const key = seed.id + (gold ? '*' : '') + q + ':' + ph;
+    let img = plantCache.get(key);
+    if (!img) {
+      if (plantCache.size > PLANT_MAX) plantCache.clear();
+      img = newCanvas(PLANT_W, PLANT_H);
+      drawPlantRaw(img.getContext('2d'), seed, PLANT_OX, PLANT_OY, q / PLANT_STEPS, gold, tt);
+      plantCache.set(key, img);
+    }
+    ctx.drawImage(img, cx - PLANT_OX, Math.round(gy) - PLANT_OY);
+  }
+
+  // cx = centre, gy = sol (haut de la butte), g = croissance 0..1
+  function drawPlantRaw(ctx, seed, cx, gy, g, gold, t) {
     const leaf = gold ? '#e0b830' : seed.leaf;
     const leafD = gold ? '#b8901c' : shade(seed.leaf, 0.75);
     const fruit = gold ? '#ffd84a' : seed.fruit;
@@ -801,6 +947,8 @@
     pets: { map: ['.p...p..', 'ppp.ppp.', '.p...p..', '........', '..ppp...', '.ppppp..', '.ppppp..', '..p.p...'], pal: { p: '#f2c49b' } },
     up: { map: ['........', '...ww...', '..wwww..', '.wwwwww.', 'ww.ww.ww', '...ww...', '...ww...', '........'], pal: { w: '#f4ead8' } },
     down: { map: ['........', '...ww...', '...ww...', 'ww.ww.ww', '.wwwwww.', '..wwww..', '...ww...', '........'], pal: { w: '#f4ead8' } },
+    factory: { map: ['.....kk.', '.....kk.', 'g.g.gkk.', 'gggggggg', 'gwggwggg', 'gggggggg', 'ggddddgg', 'ggddddgg'], pal: { g: '#7d8893', k: '#5a636d', w: '#9fd8ff', d: '#3a3a44' } },
+    food: { map: ['..y..y..', '...yy...', '.bbbbbb.', 'bwwwwwwb', 'bwyywwwb', '.bwwwwb.', '..bbbb..', '........'], pal: { b: '#c9d1d9', w: '#e8a33a', y: '#ffd84a' } },
     market: { map: ['..gggg..', '.g....g.', 'gggggggg', '.ssssss.', '.s.ss.s.', '.ssssss.', '.s.ss.s.', '.ssssss.'], pal: { g: '#8f99a4', s: '#aeb7c1' } },
     spec: { map: ['...gg...', '..gGGg..', '.gGgGGg.', 'gGGgGgGg', '.gGGgGg.', '...bb...', '...bb...', '..bbbb..'], pal: { g: '#3f8f34', G: '#6fc24a', b: '#7a5230' } },
     gel: { map: ['...w....', '.w.w.w..', '..www...', 'wwwwwww.', '..www...', '.w.w.w..', '...w....', '........'], pal: { w: '#cfefff' } },
@@ -863,5 +1011,5 @@
     return url;
   }
 
-  root.FARM_SPRITES = { px, drawMap, drawWorker, drawBarn, drawGrass, drawSoil, drawPlant, drawSparkle, drawCrow, drawCart, drawText, textWidth, iconURL, seedIconURL, petIconURL, robotIconURL, drawPet, drawHive, drawSilo, drawRod, drawEnergy, drawBolt, drawMutation, drawBoar, drawSwarm, drawThief, drawJudge, drawTornado, drawGeese, drawStarMark, ICONS };
+  root.FARM_SPRITES = { px, drawMap, drawWorker, drawBarn, drawGrass, drawSoil, drawPlant, drawSparkle, drawCrow, drawCart, drawText, textWidth, iconURL, seedIconURL, petIconURL, robotIconURL, drawPet, drawHive, drawSilo, drawRod, drawEnergy, drawBolt, drawMutation, drawBoar, drawSwarm, drawThief, drawJudge, drawTornado, drawGeese, drawStarMark, drawFactory, drawSmoke, drawBelt, drawMachine, drawFridge, drawCrate, drawPorter, ICONS };
 })(this);

@@ -239,6 +239,7 @@
     demandEvery: [50, 110], demandLife: 200, demandMax: 3,
     // Les commandes paient à parité avec le légume le plus rentable que tu possèdes : de quoi rendre le blé intéressant.
     demandParity: [1.3, 3],
+    goldVol: 0.2, goldTrend: [0.3, 4], // cours des légumes dorés (produit à part)
     parityCap: 3,         // prix plafonné à 3× la rentabilité de ton meilleur légume (cours × pénurie × commande)
     rotten: 0.1,          // en dessous de cette fraîcheur, le lot pourrit et disparaît
     // Événements du marché (toutes les `every` s) : pénurie (×mult, plus probable sur les légumes bon marché), krach, modes.
@@ -252,6 +253,7 @@
     chaleur: { name: 'résistant à la chaleur', w: 2, mult: [1.8, 2.6] },
     sec: { name: 'résistant à la sécheresse', w: 2, mult: [1.8, 2.6] },
     ogm: { name: 'OGM', w: 0 },
+    dore: { name: 'doré', w: 0 },  // légumes dorés : un produit à part, avec son propre cours
     any: { name: '', w: 5, mult: [1, 1.5] },
   };
 
@@ -268,6 +270,222 @@
       desc: 'Fusionne 3 cultures serrées en une culture intensive de 9 plants (3×3) : ×9 sur une place, actions et eau ×9, dorés ÷9.' },
     { id: 'quantique', name: 'Culture quantique', plants: 27, growth: 0.98, costMult: 900, g: 1.3, color: '#c77dff',
       desc: 'Fusionne 3 cultures intensives en une culture quantique de 27 plants : ×27 sur une place, actions et eau ×27, dorés ÷27, et pousse 2% plus lente.' },
+  ];
+
+  // ---------- Usine (transformation) : contenu de milieu-fin de partie, à partir de FACTORY.pr renaissances ----------
+  // Tous les prix de l'usine sont des multiples de FACTORY.base (le seuil de la renaissance qui la débloque).
+  const FACTORY = {
+    pr: 13,
+    base: threshold(12),
+    cost: 0.3,              // le bâtiment (× base)
+    dockX: 34,              // quai de chargement (pixels art depuis la grange)
+    slot0: 46, slotStep: 19, // emplacements des machines
+    beltSpeed: 8,           // px/s du tapis au niveau 0
+    loadTime: 4,            // s pour vider une caisse dans une machine
+    porterWalk: 12,         // px/s du manutentionnaire de base (sans robot porteur)
+    fridgeCap: 60, fridgeCost: 0.5, fridgeG: 2.4, fridgeMax: 8,
+    wholesale: 0.55,        // le grossiste rachète à prix fixe (sans trader de produits)
+    premium: 1.2,           // le marché des produits transformés, au cours
+    trendStep: 6, trendVol: 0.12, trendMin: 0.35, trendMax: 3.5, trendPull: 0.03,
+    traderEvery: 10, traderTarget: 1.1, commission: 0.12,
+    managerEvery: 20,
+    rotten: 0.08,
+    beltMax: 24,            // au-delà, les machines attendent que le tapis se vide
+    foodFee: 3,             // cuisiner une gamelle coûte foodFee × la valeur des produits utilisés
+  };
+
+  // Machines : achetées à l'unité (max par type). cost × base, ×g par machine du même type.
+  const MACHINES = [
+    { id: 'marmite', name: 'Marmite', pr: 13, cost: 1, g: 2.2, max: 6, speed: 1, desc: 'Compotes, confitures, soupes, sirops.' },
+    { id: 'four', name: 'Four à pain', pr: 13, cost: 4, g: 2.2, max: 6, speed: 0.9, desc: 'Pains, tartes et gâteaux.' },
+    { id: 'presse', name: 'Presse', pr: 14, cost: 30, g: 2.3, max: 6, speed: 1.2, desc: 'Jus et huiles.' },
+    { id: 'sorbetiere', name: 'Sorbetière', pr: 15, cost: 300, g: 2.4, max: 6, speed: 0.8, desc: 'Glaces et sorbets.' },
+    { id: 'chocolaterie', name: 'Chocolaterie', pr: 16, cost: 3000, g: 2.5, max: 6, speed: 0.7, desc: 'Chocolats et truffes.' },
+    { id: 'alambic', name: 'Alambic', pr: 17, cost: 3e4, g: 2.6, max: 6, speed: 0.6, desc: 'Parfums et élixirs.' },
+  ];
+
+  // Recettes. inputs : { fam | seed, n, gold } (n unités par lot ; gold = légumes dorés uniquement).
+  // Valeur d'un produit = valeur des ingrédients × mult ÷ out. time en secondes à vitesse 1.
+  const RECIPES = [
+    { id: 'compote', name: 'Compote', machine: 'marmite', inputs: [{ fam: 'fruit', n: 4 }], out: 2, time: 18, mult: 2.2, shelf: 2400, color: '#e8a33a' },
+    { id: 'confiture', name: 'Confiture', machine: 'marmite', inputs: [{ fam: 'baie', n: 4 }], out: 2, time: 22, mult: 2.6, shelf: 5000, color: '#c0284a' },
+    { id: 'soupe', name: 'Soupe', machine: 'marmite', inputs: [{ fam: 'feuille', n: 3 }, { fam: 'racine', n: 2 }], out: 3, time: 16, mult: 2.1, shelf: 900, color: '#7cae4a' },
+    { id: 'sirop', name: 'Sirop de fleurs', machine: 'marmite', inputs: [{ fam: 'fleur', n: 5 }], out: 2, time: 26, mult: 2.8, shelf: 6000, color: '#ff9ad5' },
+    { id: 'confiture_doree', name: 'Confiture dorée', machine: 'marmite', inputs: [{ fam: 'baie', n: 2, gold: true }, { fam: 'baie', n: 2 }], out: 1, time: 40, mult: 4.5, shelf: 8000, color: '#ffd84a' },
+    { id: 'pain', name: 'Pain', machine: 'four', inputs: [{ fam: 'cereale', n: 5 }], out: 3, time: 20, mult: 2, shelf: 700, color: '#c9933a' },
+    { id: 'tarte', name: 'Tarte aux fruits', machine: 'four', inputs: [{ fam: 'fruit', n: 3 }, { fam: 'cereale', n: 2 }], out: 2, time: 26, mult: 2.8, shelf: 1200, color: '#d9752e' },
+    { id: 'gateau', name: 'Gâteau', machine: 'four', inputs: [{ fam: 'baie', n: 2 }, { fam: 'cereale', n: 2 }, { fam: 'legumineuse', n: 1 }], out: 2, time: 32, mult: 3.2, shelf: 1500, color: '#f2c4d8' },
+    { id: 'tarte_cosmique', name: 'Tarte au chou cosmique', machine: 'four', inputs: [{ seed: 'cosmique', n: 3 }, { fam: 'cereale', n: 2 }], out: 1, time: 45, mult: 4, shelf: 3000, color: '#9a7bff' },
+    { id: 'jus', name: 'Jus de fruits', machine: 'presse', inputs: [{ fam: 'fruit', n: 4 }], out: 3, time: 12, mult: 2, shelf: 1500, color: '#f28a1e' },
+    { id: 'huile', name: 'Huile', machine: 'presse', inputs: [{ seed: 'tournesol', n: 5 }], out: 2, time: 18, mult: 2.6, shelf: 9000, color: '#e8d27a' },
+    { id: 'glace', name: 'Glace', machine: 'sorbetiere', inputs: [{ fam: 'baie', n: 3 }, { fam: 'fruit', n: 1 }], out: 2, time: 30, mult: 3.2, shelf: 4000, color: '#bfe8ff' },
+    { id: 'sorbet_dore', name: 'Sorbet doré', machine: 'sorbetiere', inputs: [{ fam: 'fruit', n: 2, gold: true }, { fam: 'baie', n: 2 }], out: 1, time: 50, mult: 5, shelf: 5000, color: '#fff1a8' },
+    { id: 'chocolat', name: 'Chocolat', machine: 'chocolaterie', inputs: [{ seed: 'cacao', n: 4 }], out: 2, time: 35, mult: 3.5, shelf: 8000, color: '#6b3a1e' },
+    { id: 'truffes_choco', name: 'Truffes au chocolat', machine: 'chocolaterie', inputs: [{ seed: 'cacao', n: 3 }, { seed: 'truffe', n: 1, gold: true }], out: 1, time: 60, mult: 6, shelf: 9000, color: '#3a1e10' },
+    { id: 'parfum', name: 'Parfum', machine: 'alambic', inputs: [{ fam: 'fleur', n: 5 }], out: 1, time: 50, mult: 4, shelf: 20000, color: '#d16ba5' },
+    { id: 'elixir', name: 'Élixir', machine: 'alambic', inputs: [{ fam: 'mythique', n: 2 }, { fam: 'fleur', n: 1, gold: true }], out: 1, time: 80, mult: 7, shelf: 20000, color: '#7fe3ff' },
+  ];
+
+  // Robots d'usine (achetés à l'unité, cost × base).
+  const FACTORY_ROBOTS = [
+    { id: 'porteur', name: 'Robot porteur', cost: 0.5, g: 1.8, max: 12, walk: 22, desc: 'Apporte les ingrédients des silos aux machines (le manutentionnaire de base est lent).' },
+    { id: 'cuistot', name: 'Robot cuistot', cost: 6, g: 2.1, max: 8, desc: 'Toutes les machines +12% chacun.' },
+    { id: 'emballeur', name: 'Robot emballeur', cost: 40, g: 2.3, max: 8, desc: 'Produits +8% de valeur chacun (jolis emballages).' },
+  ];
+
+  // Améliorations de l'usine (onglet Usine). Effets génériques fx ou lus dans factory.js.
+  UPGRADES.push(
+    { id: 'usine', tab: 'usine', pr: 13, name: 'Usine de transformation', desc: 'Construit l\'usine derrière la grange. Clique sur la grange pour y aller.', base: FACTORY.base * FACTORY.cost, g: 1, max: 1 },
+    { id: 'tapis', tab: 'usine', pr: 13, name: 'Tapis roulant', desc: 'Le tapis va 25% plus vite.', base: FACTORY.base * 0.4, g: 1.6, max: 15, req: { usine: 1 } },
+    { id: 'quai', tab: 'usine', pr: 13, name: 'Quai de chargement', desc: 'Chargement des machines 12% plus rapide.', base: FACTORY.base * 0.6, g: 1.6, max: 10, req: { usine: 1 }, fx: [{ k: 'facLoad', mult: 0.88 }] },
+    { id: 'thermostat', tab: 'usine', pr: 13, name: 'Thermostats', desc: 'Machines 15% plus rapides.', base: FACTORY.base * 1, g: 1.6, max: 15, req: { usine: 1 }, fx: [{ k: 'facSpeed', mult: 1.15 }] },
+    { id: 'cuves', tab: 'usine', pr: 13, name: 'Grandes cuves', desc: 'Chaque lot traite un lot d\'ingrédients de plus (et donne plus de produits).', base: FACTORY.base * 3, g: 1.8, max: 10, req: { usine: 1 } },
+    { id: 'grand_mere', tab: 'usine', pr: 13, name: 'Recettes de grand-mère', desc: 'Produits transformés +12%.', base: FACTORY.base * 2, g: 1.7, max: 20, req: { usine: 1 }, fx: [{ k: 'facValue', mult: 1.12 }] },
+    { id: 'frigo_xxl', tab: 'usine', pr: 13, name: 'Frigos XXL', desc: 'Frigos +50% de capacité.', base: FACTORY.base * 1.5, g: 1.7, max: 10, req: { usine: 1 } },
+    { id: 'isolation', tab: 'usine', pr: 14, name: 'Isolation', desc: 'Les produits transformés se gardent 25% plus longtemps.', base: FACTORY.base * 8, g: 1.8, max: 8, req: { usine: 1 }, fx: [{ k: 'prodSpoil', mult: 0.8 }] },
+    { id: 'trader_usine', tab: 'usine', pr: 13, name: 'Trader de produits', desc: 'Accès au marché des produits transformés (cours qui bougent) : il vend au bon moment. Sans lui, seul le grossiste achète, à prix fixe.', base: FACTORY.base * 5, g: 1, max: 1, req: { usine: 1 } },
+    { id: 'negoce', tab: 'usine', pr: 14, name: 'Négoce', desc: 'Commission du trader de produits -2%.', base: FACTORY.base * 20, g: 2, max: 5, req: { trader_usine: 1 } },
+    { id: 'gestion_usine', tab: 'usine', pr: 13, name: 'Gestionnaire d\'usine', desc: 'Choisit la recette la plus rentable pour chaque machine réglée sur « Auto », et prépare la nourriture visée pour tes compagnons.', base: FACTORY.base * 10, g: 1, max: 1, req: { usine: 1 } },
+    { id: 'coordination', tab: 'usine', pr: 14, name: 'Coordination champ-usine', desc: 'Le gestionnaire d\'usine fait planter les ingrédients qui lui manquent sur 8% du champ de plus.', base: FACTORY.base * 30, g: 2.2, max: 5, req: { gestion_usine: 1, gestion: 1 } },
+    { id: 'cuisine', tab: 'usine', pr: 13, name: 'Cuisine pour animaux', desc: 'Permet de cuisiner des gamelles pour tes compagnons à partir des produits du frigo.', base: FACTORY.base * 3, g: 1, max: 1, req: { usine: 1 } },
+  );
+
+  // Nourriture des compagnons : une gamelle se cuisine avec `units` produits de la recette + des frais.
+  // Équipée, elle agit en permanence ; retirée, son effet s'arrête (la gamelle revient dans le placard).
+  // special : effets propres à une voie (path) ou à un compagnon (pet), sinon effet « any ».
+  // mods(pm) renvoie des modificateurs qui remplacent ceux du compagnon. Les « pouvoirs » (powers) sont des actions
+  // périodiques { kind, every, ... } : rain, storm, star, gold, ripen, harvestAura, plant, water, energize, cart,
+  // frenzy, event, giant, crowGold, boost (voir pets.js).
+  const P = (kind, every, o = {}) => ({ kind, every, ...o });
+  const addPower = (pm, ...ps) => ({ powers: [...(pm.powers || []), ...ps] });
+  const PET_FOODS = [
+    { id: 'gl_glace', recipe: 'glace', units: 12, name: 'Coupe glacée',
+      any: { desc: 'Rafraîchi : robots +5%.', mods: pm => ({ robotSpeed: pm.robotSpeed * 1.05 }) },
+      special: [
+        { path: 'phenix', desc: 'Phénix givré : son aura n’assèche plus, elle humidifie la terre et fait pousser 60% plus vite.', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 1.6, evap: 0, wet: true } }) },
+        { pet: 'licorne', desc: 'Licorne des neiges : aura +30% et la terre y reste toujours humide.', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 1.3, evap: 0, wet: true } }) },
+        { path: 'harfang', desc: 'Harfang polaire : toutes les 90 s, il fait tomber une averse fraîche sur tout le champ.', mods: pm => addPower(pm, P('rain', 90, { dur: 30 })) },
+        { path: 'dragon_orage', desc: 'Dragon de glace : presque plus d’orages, mais toutes les 60 s son souffle glacé fait gagner +25% de croissance à toutes les plantes.', mods: pm => ({ stormMult: 0.2, ...addPower(pm, P('boost', 60, { n: 0.25 })) }) },
+        { pet: 'chat', desc: 'Chat glacé : il lèche sa glace au lieu de jouer : plus aucune récolte perdue.', mods: () => ({ nothing: 0 }) },
+      ] },
+    { id: 'gl_tarte_cosmique', recipe: 'tarte_cosmique', units: 6, name: 'Part de tarte cosmique',
+      any: { desc: 'Poussière d’étoiles : toutes les 3 min, une plante devient étoilée.', mods: pm => addPower(pm, P('star', 180, { n: 1 })) },
+      special: [
+        { path: 'ver', desc: 'Ver cosmique : il traverse tout le champ à l’horizontale, fait mûrir chaque plante sans en manger aucune, et 1 plante sur 10 devient étoilée.', mods: pm => ({ worm: pm.worm && { ...pm.worm, sweep: true, star: 0.1 } }) },
+        { path: 'cheshire', desc: 'Chat cosmique : chaque plante qu’il fait mûrir a 1 chance sur 4 de devenir étoilée.', mods: () => ({ ripenStar: 0.25 }) },
+        { path: 'etoilee', desc: 'Licorne astrale : toutes les 40 s, une pluie de 3 étoiles filantes.', mods: pm => addPower(pm, P('star', 40, { n: 3 })) },
+        { path: 'basilic', desc: 'Basilic stellaire : chaque cri transforme une plante en étoile.', mods: pm => ({ cry: pm.cry && { ...pm.cry, star: 1 } }) },
+        { pet: 'hibou', desc: 'Hibou astronome : il appelle une comète toutes les 4 min.', mods: pm => addPower(pm, P('event', 240, { ev: 'comete' })) },
+      ] },
+    { id: 'gl_compote', recipe: 'compote', units: 16, name: 'Bol de compote',
+      any: { desc: 'Repu : tous les légumes +3%.', mods: pm => ({ valueAll: pm.valueAll * 1.03 }) },
+      special: [
+        { pet: 'poussin', desc: 'Couvée : 2 poussins de plus portent l’aura.', mods: pm => ({ chicks: pm.chicks + 2 }) },
+        { path: 'rapace', desc: 'Rapace gavé : il ne chasse plus, il couve. 4 poussins avec une aura +40%.', mods: () => ({ chicks: 4, crowHunter: null, perch: false, aura: { mult: 1.4, radius: 16, value: 1, evap: 1 }, move: 'wander' }) },
+        { pet: 'renard', desc: 'Renard repu : il ne chaparde plus rien, et ramène le marchand toutes les 3 min.', mods: pm => ({ nothing: 0, ...addPower(pm, P('cart', 180)) }) },
+        { path: 'nuee', desc: 'Nuée sucrée : toutes les 20 s, les abeilles récoltent elles-mêmes les fruits mûrs de tout le champ.', mods: pm => addPower(pm, P('harvestAura', 20, { all: true, fam: 'fruit' })) },
+      ] },
+    { id: 'gl_pain', recipe: 'pain', units: 20, name: 'Croûtons',
+      any: { desc: 'Fermier +10%.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.1 }) },
+      special: [
+        { pet: 'chien', desc: 'Chien gâté : un chien de plus dans la meute, et les récoltes du fermier +20%.', mods: pm => ({ petWorkerCount: pm.petWorkerCount + (pm.petWorker ? 1 : 0), farmerHarvest: pm.farmerHarvest * 1.2 }) },
+        { path: 'saintbernard', desc: 'Saint-Bernard boulanger : le fermier devient 2× plus rapide, mais il s’arrête manger : robots -10%.', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 2, robotSpeed: pm.robotSpeed * 0.9 }) },
+        { pet: 'poussin', desc: 'Poussins aux miettes : ils picorent les miettes au lieu des légumes : plus de malus de valeur dans l’aura.', mods: pm => ({ aura: pm.aura && { ...pm.aura, value: Math.max(1, pm.aura.value) } }) },
+        { path: 'loup', desc: 'Meute affamée : 2 loups de plus, mais ils font fuir les touristes.', mods: pm => ({ petWorkerCount: pm.petWorkerCount + 2, chaseBoar: true, noTourists: true }) },
+      ] },
+    { id: 'gl_confiture', recipe: 'confiture', units: 14, name: 'Pot de confiture',
+      any: { desc: '+3% de doubles récoltes.', mods: pm => ({ double: pm.double + 0.03 }) },
+      special: [
+        { pet: 'abeille', desc: 'Ruche gourmande : le miel rapporte 3× plus.', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 3 } }) },
+        { path: 'guerriere', desc: 'Frelons collants : ils engluent les corbeaux, qui se changent en légumes dorés.', mods: pm => addPower(pm, P('crowGold', 5)) },
+        { pet: 'renard', desc: 'Renard barbouillé : il ne chasse plus, mais les voleurs le trouvent mignon et repartent les mains vides.', mods: () => ({ crowHunter: null, guardSilo: true }) },
+        { path: 'phenix', desc: 'Phénix caramélisé : toutes les 30 s, une plante de son aura devient dorée.', mods: pm => addPower(pm, P('gold', 30, { n: 1, aura: true })) },
+      ] },
+    { id: 'gl_huile', recipe: 'huile', units: 14, name: 'Burette d’huile',
+      any: { desc: 'Robots rechargés 20% plus vite.', mods: pm => ({ chargeMult: pm.chargeMult * 1.2 }) },
+      special: [
+        { path: 'foreuse', desc: 'Foreuse graissée : plus de surconsommation des batteries, et robots encore +20%.', mods: pm => ({ batteryDrain: 1, robotSpeed: pm.robotSpeed * 1.2 }) },
+        { pet: 'taupe', desc: 'Taupe huilée : robots +20% et batteries 2× moins usées.', mods: pm => ({ robotSpeed: pm.robotSpeed * 1.2, batteryDrain: pm.batteryDrain * 0.5 }) },
+        { path: 'phenix', desc: 'Phénix à l’huile : son aura s’enflamme. Les plantes y poussent 2× plus vite, mais la terre y sèche 10× plus vite.', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 2, evap: 10 } }) },
+        { path: 'dragon_orage', desc: 'Dragon-dynamo : robots rechargés 3× plus vite, et toutes les 2 min il énergise 3 plantes (×100 à la récolte, à cueillir vite).', mods: pm => ({ chargeMult: pm.chargeMult * 3, ...addPower(pm, P('energize', 120, { n: 3 })) }) },
+      ] },
+    { id: 'gl_soupe', recipe: 'soupe', units: 18, name: 'Soupe chaude',
+      any: { desc: 'Malus de nuit -20%.', mods: pm => ({ nightRelief: Math.min(1, pm.nightRelief + 0.2) }) },
+      special: [
+        { pet: 'hibou', desc: 'Hibou repu : nuits encore 30% plus courtes et plus aucun malus de nuit.', mods: pm => ({ nightSpeed: pm.nightSpeed * 1.3, nightRelief: 1 }) },
+        { path: 'cerbere', desc: 'Cerbère réchauffé : il travaille aussi le jour.', mods: pm => ({ petWorker: pm.petWorker && { ...pm.petWorker, onlyAt: null } }) },
+        { path: 'effraie', desc: 'Chouette effraie au chaud : elle fait mûrir une plante toutes les 6 s au lieu de 12.', mods: pm => ({ ripenEvery: pm.ripenEvery / 2 }) },
+        { pet: 'chien', desc: 'Chien de soupe populaire : toutes les 2 min, des touristes affamés arrivent.', mods: pm => addPower(pm, P('event', 120, { ev: 'touristes' })) },
+      ] },
+    { id: 'gl_chocolat', recipe: 'chocolat', units: 10, name: 'Carré de chocolat',
+      any: { desc: 'Tous les légumes +5%.', mods: pm => ({ valueAll: pm.valueAll * 1.05 }) },
+      special: [
+        { path: 'lynx', desc: 'Lynx gourmand : +10% de doubles récoltes.', mods: pm => ({ double: pm.double + 0.1 }) },
+        { path: 'noir', desc: 'Chat noir chocolat : il porte bonheur au lieu de malheur : 2× moins de corbeaux et plus de récoltes perdues.', mods: () => ({ crowMult: 0.5, nothing: 0 }) },
+        { pet: 'chat', desc: 'Chat comblé : légumes dorés ×1.5.', mods: pm => ({ goldenMult: pm.goldenMult * 1.5 }) },
+        { path: 'kitsune', desc: 'Kitsune au chocolat : pendant un marché en folie, les produits transformés se vendent aussi ×2.', mods: () => ({ frenzyFactory: true }) },
+        { pet: 'dragon', desc: 'Dragon chocolatier : toutes les 5 min, une foire agricole.', mods: pm => addPower(pm, P('event', 300, { ev: 'foire' })) },
+      ] },
+    { id: 'gl_parfum', recipe: 'parfum', units: 6, name: 'Goutte de parfum',
+      any: { desc: 'Les corbeaux fuient l’odeur : 2× moins de corbeaux.', mods: pm => ({ crowMult: pm.crowMult * 0.5 }) },
+      special: [
+        { path: 'kitsune', desc: 'Kitsune envoûtant : marché en folie encore 1.5× plus fréquent.', mods: pm => ({ frenzyFreq: pm.frenzyFreq * 1.5 }) },
+        { pet: 'abeille', desc: 'Abeilles enivrées : leur bonus de valeur double, mais elles butinent en zigzag : robots -10%.', mods: pm => ({ valueAll: 1 + (pm.valueAll - 1) * 2, robotSpeed: pm.robotSpeed * 0.9 }) },
+        { pet: 'licorne', desc: 'Licorne parfumée : toutes les 2 min, un arc-en-ciel.', mods: pm => addPower(pm, P('event', 120, { ev: 'arcenciel' })) },
+        { path: 'renard_roux', desc: 'Renard musqué : les sangliers le suivent et labourent : toutes les 60 s, toutes les parcelles vides sont plantées.', mods: pm => addPower(pm, P('plant', 60)) },
+      ] },
+    { id: 'gl_sorbet_dore', recipe: 'sorbet_dore', units: 6, name: 'Sorbet doré',
+      any: { desc: '+1% de légumes dorés.', mods: pm => ({ golden: pm.golden + 0.01 }) },
+      special: [
+        { pet: 'licorne', desc: 'Licorne dorée : +3% de dorés et dorés ×1.5.', mods: pm => ({ golden: pm.golden + 0.03, goldenMult: pm.goldenMult * 1.5 }) },
+        { path: 'dragon_or', desc: 'Dragon d’or glacé : toutes les 20 s, 2 plantes deviennent dorées.', mods: pm => addPower(pm, P('gold', 20, { n: 2 })) },
+        { path: 'doree', desc: 'Ruche d’or : toutes les 60 s, une plante devient dorée.', mods: pm => addPower(pm, P('gold', 60, { n: 1 })) },
+        { pet: 'chat', desc: 'Chat doré : il se roule dans les plantes : toutes les 25 s, une plante près de lui devient dorée.', mods: pm => addPower(pm, P('gold', 25, { n: 1, aura: true, radius: 20 })) },
+      ] },
+    { id: 'gl_confiture_doree', recipe: 'confiture_doree', units: 6, name: 'Confiture dorée',
+      any: { desc: '+1% de légumes dorés.', mods: pm => ({ golden: pm.golden + 0.01 }) },
+      special: [
+        { path: 'basilic', desc: 'Basilic doré : il crie 2× plus souvent.', mods: pm => ({ cry: pm.cry && { ...pm.cry, every: pm.cry.every / 2 } }) },
+        { path: 'cristal', desc: 'Taupe de cristal dorée : ses gemmes valent 2× plus.', mods: pm => ({ gem: pm.gem && { ...pm.gem, mult: pm.gem.mult * 2 } }) },
+        { pet: 'renard', desc: 'Renard collant : les corbeaux se collent à lui et se changent en légumes dorés.', mods: pm => addPower(pm, P('crowGold', 8)) },
+      ] },
+    { id: 'gl_elixir', recipe: 'elixir', units: 4, name: 'Fiole d’élixir',
+      any: { desc: 'Tous les légumes +10%.', mods: pm => ({ valueAll: pm.valueAll * 1.1 }) },
+      special: [
+        { pet: 'dragon', desc: 'Dragon apaisé : tous les légumes +30% et il n’attire plus les orages.', mods: pm => ({ valueAll: pm.valueAll * 1.3, stormMult: 1 }) },
+        { path: 'wyverne', desc: 'Wyverne enragée : elle rugit toutes les 10 s, mais les robots restent figés 4 s.', mods: pm => ({ cry: pm.cry && { ...pm.cry, every: 10, freeze: 4 } }) },
+        { path: 'ver', desc: 'Ver géant : il surgit 2× plus souvent et tout ce qu’il fait mûrir devient géant.', mods: pm => ({ worm: pm.worm && { ...pm.worm, every: pm.worm.every / 2, giant: true } }) },
+        { pet: 'taupe', desc: 'Taupe alchimiste : toutes les 2 min, 3 plantes deviennent géantes.', mods: pm => addPower(pm, P('giant', 120, { n: 3 })) },
+        { pet: 'hibou', desc: 'Hibou mage : toutes les 3 min, une éclipse.', mods: pm => addPower(pm, P('event', 180, { ev: 'eclipse' })) },
+      ] },
+    { id: 'gl_truffes', recipe: 'truffes_choco', units: 4, name: 'Truffes au chocolat',
+      any: { desc: 'Toutes les plantes poussent 8% plus vite.', mods: pm => ({ growthAll: pm.growthAll * 1.08 }) },
+      special: [
+        { path: 'cristal', desc: 'Cristal gourmand : gemmes 2× plus fréquentes.', mods: pm => ({ gem: pm.gem && { ...pm.gem, chance: pm.gem.chance * 2 } }) },
+        { pet: 'renard', desc: 'Renard truffier : toutes les 90 s, il déterre une truffe : une plante mûrit et devient dorée.', mods: pm => addPower(pm, P('gold', 90, { n: 1, ripen: true })) },
+        { pet: 'chien', desc: 'Chien truffier : toutes les 2 min, il récolte toutes les plantes mûres autour de lui.', mods: pm => addPower(pm, P('harvestAura', 120, { radius: 60 })) },
+      ] },
+    { id: 'gl_jus', recipe: 'jus', units: 16, name: 'Gourde de jus',
+      any: { desc: 'Toutes les 2 min, il arrose tout le champ.', mods: pm => addPower(pm, P('water', 120)) },
+      special: [
+        { path: 'nuee', desc: 'Nuage de jus : l’essaim fait pleuvoir 20 s toutes les 2 min.', mods: pm => addPower(pm, P('rain', 120, { dur: 20 })) },
+        { path: 'fennec', desc: 'Fennec désaltéré : la terre de tout le champ sèche 30% moins vite.', mods: () => ({ evapAll: 0.7 }) },
+        { path: 'sylvestre', desc: 'Licorne de source : son aura devient une source : la terre y reste humide et les plantes poussent +20%.', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 1.2, evap: 0, wet: true } }) },
+      ] },
+    { id: 'gl_gateau', recipe: 'gateau', units: 8, name: 'Part de gâteau',
+      any: { desc: 'Fête : tous les compagnons gagnent 30% d’XP en plus.', mods: () => ({ petXpMult: 1.3 }) },
+      special: [
+        { pet: 'poussin', desc: 'Anniversaire : toutes les 4 min, une foire agricole.', mods: pm => addPower(pm, P('event', 240, { ev: 'foire' })) },
+        { path: 'saintbernard', desc: 'Saint-Bernard festif : toutes les 3 min, le marché s’emballe.', mods: pm => addPower(pm, P('frenzy', 180)) },
+        { pet: 'licorne', desc: 'Licorne de fête : toutes les 90 s, des oies sauvages survolent le champ.', mods: pm => addPower(pm, P('event', 90, { ev: 'oies' })) },
+      ] },
+    { id: 'gl_sirop', recipe: 'sirop', units: 10, name: 'Sirop de fleurs',
+      any: { desc: 'Toutes les 2 min, 3 plantes au hasard mûrissent.', mods: pm => addPower(pm, P('ripen', 120, { n: 3 })) },
+      special: [
+        { pet: 'abeille', desc: 'Abeilles au sirop : toutes les 30 s, 5 plantes mûrissent.', mods: pm => addPower(pm, P('ripen', 30, { n: 5 })) },
+        { path: 'phenix', desc: 'Phénix sucré : toutes les 45 s, tout ce que touche son aura mûrit.', mods: pm => addPower(pm, P('ripen', 45, { aura: true, n: 99 })) },
+        { path: 'dragon_orage', desc: 'Orage sucré : il appelle un orage toutes les 3 min.', mods: pm => addPower(pm, P('storm', 180, { dur: 40 })) },
+      ] },
   ];
 
   // Courbe de prix : chaque niveau coûte g^COST_CURVE fois le précédent (g tel qu'écrit ci-dessus).
@@ -431,6 +649,13 @@
     stormMult: 1,        // fréquence des orages
     chaseBoar: false,    // chasse les sangliers
     guardSilo: false,    // garde les silos contre les voleurs
+    // Nourriture (usine) :
+    powers: null,        // [{ kind, every, ... }] : pouvoirs périodiques (voir pets.js)
+    ripenStar: 0,        // chance qu'une plante mûrie par le compagnon devienne étoilée
+    noTourists: false,   // fait fuir les touristes
+    frenzyFactory: false,// marché en folie aussi pour les produits transformés
+    evapAll: 1,          // vitesse d'assèchement de tout le champ
+    petXpMult: 1,        // XP de tous les compagnons
   };
 
   // XP : 1 par seconde active. Niveaux 1-20 : arbre ; 21-30 : maîtrise (une fois la voie choisie).
@@ -904,6 +1129,7 @@
   const DATA = {
     SEEDS, FAMILIES, ECO, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
     BRANCHES, FAST_GROW, TALENTS, SPEC_PENALTY, BIO, SCIENCE, PETS, PET_MOD_DEFAULTS, PET_LEVEL, MASTERY, PERKS, PERK_CATS,
+    FACTORY, MACHINES, RECIPES, FACTORY_ROBOTS, PET_FOODS,
     PRESTIGE, threshold, ACH_BONUS, WEATHER, DAY_LEN, EVENTS, EVENTS_EVERY, EVENT_FX, ACHIEVEMENTS, fmt, fmtTime,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DATA;

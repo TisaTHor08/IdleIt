@@ -5,7 +5,7 @@
   'use strict';
   const NODE = typeof module !== 'undefined' && module.exports;
   const D = NODE ? require('./data.js') : root.FARM_DATA;
-  const MIXINS = NODE ? [require('./pets.js'), require('./market.js'), require('./events.js')] : (root.FARM_MIXINS || []);
+  const MIXINS = NODE ? [require('./pets.js'), require('./market.js'), require('./events.js'), require('./factory.js')] : (root.FARM_MIXINS || []);
 
   const LAYOUT = { BARN_W: 26, PLOT_W: 12, PLOT_STEP: 15, PAD: 3 };
   const SAVE_VERSION = 2;
@@ -15,6 +15,10 @@
   const PERK_BY_ID = Object.fromEntries(D.PERKS.map(p => [p.id, p]));
   const TAL_BY_ID = Object.fromEntries(D.TALENTS.map(t => [t.id, t]));
   const PET_BY_ID = Object.fromEntries(D.PETS.map(p => [p.id, p]));
+  const MACHINE_BY_ID = Object.fromEntries(D.MACHINES.map(m => [m.id, m]));
+  const RECIPE_BY_ID = Object.fromEntries(D.RECIPES.map(r => [r.id, r]));
+  const FROBOT_BY_ID = Object.fromEntries(D.FACTORY_ROBOTS.map(r => [r.id, r]));
+  const FOOD_BY_ID = Object.fromEntries(D.PET_FOODS.map(f => [f.id, f]));
   const BRANCH_BY_ID = Object.fromEntries(D.BRANCHES.map(b => [b.id, b]));
   const CHARGER = { from: 4, to: 21 }; // zone de recharge des robots, devant la grange
 
@@ -26,6 +30,11 @@
     return { silos: 0, stock: {}, trend: {}, sold: {}, made: {}, demands: [], shocks: [], trendT: 0, demandT: 45, shockT: 120, traderT: 0, managerT: 5 };
   }
 
+  // Usine : remise à zéro à la renaissance (la nourriture des compagnons, elle, est gardée dans s.pantry).
+  function defaultFactory() {
+    return { machines: [], robots: {}, fridges: 0, stock: {}, trend: {}, target: null, trendT: 0, traderT: 5, managerT: 5 };
+  }
+
   function defaultState() {
     return {
       v: SAVE_VERSION,
@@ -34,7 +43,9 @@
       everSeeds: {},                               // graines débloquées au moins une fois (succès)
       stats: {}, ach: {},
       gsTotal: 0, gsSpent: 0, perks: {},
-      pets: { list: [], seen: {}, nextUid: 1 },     // compagnons : gardés à la renaissance, mais remis au niveau 0
+      pets: { list: [], seen: {}, nextUid: 1 },
+      pantry: {},                                  // gamelles des compagnons (gardées à la renaissance)
+      factory: defaultFactory(),                   // usine : remise à zéro à la renaissance     // compagnons : gardés à la renaissance, mais remis au niveau 0
       market: { unlocked: false },                 // conservé à la renaissance
       trade: defaultTrade(),                       // silos, stock et cours : remis à zéro à la renaissance
       clock: { t: D.DAY_LEN * 0.3, weather: 'soleil', weatherT: 150, nextCrow: 80, nextCart: 240, nextFrenzy: 420, frenzyT: 0, nextBlight: 90, nextEvent: 90 },
@@ -51,6 +62,7 @@
       this.crows = [];
       this.cart = null;
       this.brush = null;     // graine "pinceau" sélectionnée par le joueur
+      this.view = 'farm';    // scène affichée : 'farm' ou 'factory'
       this.incomeBuckets = new Array(20).fill(0);
       this.harvestBuckets = new Array(20).fill(0); // revenus des seules récoltes : base des bonus (miel, corbeaux...)
       this.bucketT = 0;
@@ -97,6 +109,9 @@
       for (const k of ['trend', 'sold', 'made']) tr[k] = { ...(tr[k] || {}) };
       s.trade = tr;
       s.pets = this.loadPets(data.pets, oldVersion);
+      s.pantry = Object.fromEntries(Object.entries(data.pantry || {}).filter(([k, v]) => FOOD_BY_ID[k] && v > 0).map(([k, v]) => [k, Math.floor(+v)]));
+      for (const pet of s.pets.list) if (!FOOD_BY_ID[pet.food]) pet.food = null;
+      s.factory = this.loadFactory(data.factory);
       s.seeds[D.SEEDS[0].id] = true;
       s.plots = (Array.isArray(data.plots) ? data.plots : []).map(p => ({
         seed: p && (p.seed === 'auto' || SEED_BY_ID[p.seed]) ? p.seed : 'auto',
@@ -123,6 +138,22 @@
       return true;
     }
 
+    loadFactory(f) {
+      const out = defaultFactory();
+      if (!f || typeof f !== 'object') return out;
+      out.machines = (Array.isArray(f.machines) ? f.machines : []).filter(m => m && MACHINE_BY_ID[m.type]).map(m => ({
+        type: m.type, recipe: m.recipe === 'auto' || (RECIPE_BY_ID[m.recipe] && RECIPE_BY_ID[m.recipe].machine === m.type) ? m.recipe : 'auto',
+        st: m.lot && RECIPE_BY_ID[m.lot.id] ? (m.st === 2 ? 2 : 1) : 0, t: +m.t || 0, lot: m.lot && RECIPE_BY_ID[m.lot.id] ? { id: m.lot.id, worth: +m.lot.worth || 0, lots: +m.lot.lots || 1 } : null,
+      }));
+      for (const r of D.FACTORY_ROBOTS) if (f.robots && f.robots[r.id] > 0) out.robots[r.id] = Math.min(r.max, Math.floor(f.robots[r.id]));
+      out.fridges = Math.min(D.FACTORY.fridgeMax, Math.floor(+f.fridges || 0));
+      out.stock = Object.fromEntries(Object.entries(f.stock || {}).filter(([k, e]) => RECIPE_BY_ID[k] && e && e.units > 0)
+        .map(([k, e]) => [k, { id: k, units: +e.units, worth: +e.worth || 0, fresh: e.fresh == null ? 1 : +e.fresh }]));
+      out.trend = { ...(f.trend || {}) };
+      out.target = FOOD_BY_ID[f.target] ? f.target : null;
+      return out;
+    }
+
     loadPets(pets, oldVersion) {
       const out = { list: [], seen: {}, nextUid: 1 };
       if (!pets || typeof pets !== 'object') return out;
@@ -133,7 +164,7 @@
         for (const n of def.nodes) if (d.nodes && d.nodes[n.id]) nodes[n.id] = Math.min(d.nodes[n.id], n.max);
         for (const m of D.MASTERY) if (d.mastery && d.mastery[m.id]) mastery[m.id] = Math.min(d.mastery[m.id], m.max);
         const path = def.paths.some(x => x.id === d.path) ? d.path : null;
-        return { uid: out.nextUid++, id, xp: +d.xp || 0, nodes, path, mastery };
+        return { uid: out.nextUid++, id, xp: +d.xp || 0, nodes, path, mastery, food: d.food || null };
       };
       if (oldVersion < 2) {
         // Ancien format : un seul compagnon actif.
@@ -177,6 +208,8 @@
       s.up = {};
       s.tal = {};
       s.trade = defaultTrade();
+      s.factory = defaultFactory();
+      this.belt = []; this.porters = [];
       s.robots = this.perk('fidele') ? { rouille: this.perk('fidele') } : {};
       s.seeds = {};
       const keep = 1 + this.perk('memoire');
@@ -322,6 +355,7 @@
       if (this.s.clock.weather === 'canicule' && (this.lvl('serre') || this.tal('gene_chaleur'))) e = 1;
       const aura = this.auraAt(i);
       if (aura) e *= aura.evap;
+      e *= this.pm.evapAll;
       e *= (1 + 0.08 * this.tal('chimie')) * this.fxMul('evap', { fam: seed.fam });
       return e * seed.thirst * this.plotPlants(i) / (30 * (1 + 0.1 * this.lvl('arrosoir')));
     }
@@ -370,6 +404,9 @@
         case 'merge': { const t = +id, lvl = this.tierCount(t); return { level: lvl, max: lvl + Math.floor(this.tierCount(t - 1) / 3), cost: k => this.mergeCost(t, k) }; }
         case 'seed': return { level: this.s.seeds[id] ? 1 : 0, max: 1, cost: () => this.seedCost(id) };
         case 'tal': return { level: this.tal(id), max: TAL_BY_ID[id].max, cost: k => this.talCost(id, k) };
+        case 'machine': return { level: this.machineCount(id), max: MACHINE_BY_ID[id].max, cost: k => this.machineCost(id, k) };
+        case 'frobot': return { level: this.s.factory.robots[id] || 0, max: FROBOT_BY_ID[id].max, cost: k => this.frobotCost(id, k) };
+        case 'fridge': return { level: this.s.factory.fridges, max: D.FACTORY.fridgeMax, cost: k => this.fridgeCost(k) };
         default: return null;
       }
     }
@@ -380,6 +417,8 @@
       if (kind === 'silo') return !this.marketOn();
       if (kind === 'seed') return !this.eraOk(SEED_BY_ID[id]);
       if (kind === 'robot') return !this.eraOk(ROBOT_BY_ID[id]);
+      if (kind === 'machine') return !this.factoryOn() || !this.eraOk(MACHINE_BY_ID[id]);
+      if (kind === 'frobot' || kind === 'fridge') return !this.factoryOn();
       return false;
     }
 
@@ -409,6 +448,9 @@
         else if (kind === 'merge') this.mergePlots(+id);
         else if (kind === 'seed') { this.s.seeds[id] = true; this.s.everSeeds[id] = true; this.emit('seed', { id }); }
         else if (kind === 'tal') this.s.tal[id] = this.tal(id) + 1;
+        else if (kind === 'machine') this.addMachine(id);
+        else if (kind === 'frobot') this.s.factory.robots[id] = (this.s.factory.robots[id] || 0) + 1;
+        else if (kind === 'fridge') this.s.factory.fridges++;
       }
       if (kind === 'robot') this.syncWorkers();
       if (kind === 'up') this.rebuildFx();
@@ -746,7 +788,7 @@
       const lost = !crop.gold && Math.random() < this.pm.nothing;
       if (lost) { v = 0; this.emit('pet-lost', { plot: i }); }
       let stored = null;
-      if (v > 0 && this.marketOn() && source !== 'tourist' && source !== 'fair') stored = this.store(seed, this.produceTraits(), v, this.plotPlants(i));
+      if (v > 0 && this.marketOn() && source !== 'tourist' && source !== 'fair') stored = this.store(seed, crop.gold ? this.produceTraits().concat('dore') : this.produceTraits(), v, this.plotPlants(i));
       else this.earn(v);
       this.harvestBuckets[this.harvestBuckets.length - 1] += v;
       this.addStat('harvest');
@@ -852,7 +894,7 @@
         // L'aura brûlante du phénix assèche plus vite que l'irrigation n'arrose (la pluie protège encore).
         const aura = this.auraAt(i);
         const scorched = aura && aura.evap > 3;
-        if (raining || (this.irrigated(i) && !scorched)) pl.moist = 1;
+        if (raining || (aura && aura.wet) || (this.irrigated(i) && !scorched)) pl.moist = 1;
         else pl.moist = Math.max(0, pl.moist - dt * this.evapRate(i));
         if (pl.crop && pl.crop.energized > 0) {
           pl.crop.energized -= dt;
@@ -882,6 +924,7 @@
       this.updateCrows(dt);
       this.updateCart(dt);
       this.updateMarket(dt);
+      this.updateFactory(dt);
 
       this.achT += dt;
       if (this.achT >= 1) { this.achT = 0; this.checkAchievements(); }
@@ -1095,7 +1138,7 @@
   const HELPERS = { D, LAYOUT, plotX, rand, gauss, SEED_BY_ID, PET_BY_ID, ROBOT_BY_ID };
   for (const install of MIXINS) install(Game.prototype, HELPERS);
 
-  const CORE = { Game, LAYOUT, plotX, SEED_BY_ID, UP_BY_ID, ROBOT_BY_ID, PERK_BY_ID, PET_BY_ID, TAL_BY_ID, SILO: { W: 7, STEP: 9, GAP: 6, RESERVE: 80 } };
+  const CORE = { Game, LAYOUT, plotX, SEED_BY_ID, UP_BY_ID, ROBOT_BY_ID, PERK_BY_ID, PET_BY_ID, TAL_BY_ID, RECIPE_BY_ID, MACHINE_BY_ID, FOOD_BY_ID, SILO: { W: 7, STEP: 9, GAP: 6, RESERVE: 80 } };
   if (NODE) module.exports = CORE;
   else root.FARM_CORE = CORE;
 })(this);

@@ -6,14 +6,15 @@
 
   // Règles de combinaison des modificateurs de plusieurs compagnons.
   const MULT = ['nightSpeed', 'farmerSpeed', 'robotSpeed', 'farmerHarvest', 'goldenMult', 'frenzyFreq', 'cartMult', 'irrigGrowth',
-    'fastGrowth', 'slowGrowth', 'valueAll', 'chargeMult', 'batteryDrain', 'crowMult', 'growthAll', 'stormMult'];
-  const ADD = { nightRelief: 1, clickBoost: Infinity, golden: Infinity, double: 0.9, nothing: 0.9, irrigateExtra: Infinity, headStart: 0.9 };
-  const OR = ['noCrows', 'autoCart', 'noCart', 'farmerNoSleep', 'noPests', 'noSolar', 'chaseBoar', 'guardSilo', 'perch'];
+    'fastGrowth', 'slowGrowth', 'valueAll', 'chargeMult', 'batteryDrain', 'crowMult', 'growthAll', 'stormMult', 'evapAll', 'petXpMult'];
+  const ADD = { nightRelief: 1, clickBoost: Infinity, golden: Infinity, double: 0.9, nothing: 0.9, irrigateExtra: Infinity, headStart: 0.9, ripenStar: 1 };
+  const OR = ['noCrows', 'autoCart', 'noCart', 'farmerNoSleep', 'noPests', 'noSolar', 'chaseBoar', 'guardSilo', 'perch', 'noTourists', 'frenzyFactory'];
 
   function install(G, H) {
-    const { D, LAYOUT, plotX, rand } = H;
+    const { D, LAYOUT, plotX, rand, SEED_BY_ID } = H;
     const PET_BY_ID = H.PET_BY_ID;
     const MASTERY_BY_ID = Object.fromEntries(D.MASTERY.map(m => [m.id, m]));
+    const FOOD_BY_ID = Object.fromEntries(D.PET_FOODS.map(f => [f.id, f]));
 
     Object.assign(G, {
       // ---------- Emplacements ----------
@@ -28,7 +29,9 @@
         const cost = def ? this.petCost(id) : Infinity;
         if (!def || !this.eraOk(def) || slot >= this.petSlots() || slot > this.s.pets.list.length || this.s.money < cost) return false;
         this.s.money -= cost;
-        const pet = { uid: this.s.pets.nextUid++, id, xp: 0, nodes: {}, path: null, mastery: {} };
+        const pet = { uid: this.s.pets.nextUid++, id, xp: 0, nodes: {}, path: null, mastery: {}, food: null };
+        const old = this.s.pets.list[slot];
+        if (old && old.food) this.s.pantry[old.food] = (this.s.pantry[old.food] || 0) + 1;
         if (slot < this.s.pets.list.length) this.s.pets.list[slot] = pet; else this.s.pets.list.push(pet);
         this.s.pets.seen[id] = true;
         this.refreshPet();
@@ -103,7 +106,29 @@
         const pm = { ...D.PET_MOD_DEFAULTS, ...def.mods(L, this.petEvolved(pet)) };
         const path = this.petPath(pet);
         if (path) Object.assign(pm, path.mods(L, { ...pm }));
+        const food = this.foodEffect(pet);
+        if (food) Object.assign(pm, food.mods({ ...pm }));
         return pm;
+      },
+
+      // ---------- Nourriture ----------
+      // Effet d'une gamelle sur ce compagnon : celui de sa voie, sinon de son espèce, sinon l'effet général.
+      foodEffectFor(pet, foodId) {
+        const f = FOOD_BY_ID[foodId];
+        if (!f) return null;
+        return f.special.find(x => x.path && x.path === pet.path) || f.special.find(x => x.pet === pet.id) || f.any;
+      },
+      foodEffect(pet) { return pet && pet.food ? this.foodEffectFor(pet, pet.food) : null; },
+      // Donne une gamelle du placard (celle qu'il avait déjà y retourne), ou la retire (foodId = null).
+      equipFood(pet, foodId) {
+        if (!pet) return false;
+        if (foodId && !(this.s.pantry[foodId] > 0)) return false;
+        if (pet.food) this.s.pantry[pet.food] = (this.s.pantry[pet.food] || 0) + 1;
+        pet.food = null;
+        if (foodId) { this.s.pantry[foodId]--; pet.food = foodId; this.addStat('petMeals'); }
+        this.refreshPet();
+        this.emit('pet-food', { uid: pet.uid, food: foodId });
+        return true;
       },
 
       // Recalcule tout après un changement de compagnon, d'arbre, de voie ou de maîtrise.
@@ -161,15 +186,15 @@
         for (const r of Object.values(this.petRt || {})) {
           const au = r.pm.aura;
           if (!au || !r.ents.some(e => Math.abs(e.x - x) <= au.radius)) continue;
-          a = a || { mult: 1, value: 1, evap: 1, noNight: false };
-          a.mult *= au.mult; a.value *= au.value; a.evap *= au.evap; a.noNight = a.noNight || r.pm.auraNoNight;
+          a = a || { mult: 1, value: 1, evap: 1, noNight: false, wet: false };
+          a.mult *= au.mult; a.value *= au.value; a.evap *= au.evap; a.noNight = a.noNight || r.pm.auraNoNight; a.wet = a.wet || !!au.wet;
         }
         return a;
       },
       inAura(i) { return !!this.auraAt(i); },
 
       petXp(n) {
-        const mult = this.fxMul('petXp');
+        const mult = this.fxMul('petXp') * this.pm.petXpMult;
         for (const pet of this.s.pets.list) {
           const before = this.petLevel(pet);
           pet.xp += n * mult;
@@ -226,6 +251,7 @@
               if (c && c.p < 1 && !c.pest) { c.p = Math.min(1, c.p + pm.cry.boost); if (c.p >= 1) this.ripen(i); }
             }
             for (const w of this.workers) if (this.usesBattery(w)) w.frozenT = pm.cry.freeze * this.fxMul('frozen');
+            if (pm.cry.star) this.makeStars(pm.cry.star);
             this.emit('cry', { x: main.x });
           }
         }
@@ -237,21 +263,34 @@
             const i = growing[Math.floor(Math.random() * growing.length)];
             this.s.plots[i].crop.p = 1;
             this.ripen(i);
+            if (Math.random() < pm.ripenStar) { this.s.plots[i].crop.star = true; this.emit('star', { plot: i }); }
             main.x = main.tx = plotX(i); main.pause = 3;
             this.emit('cheshire', { plot: i });
           }
         }
 
-        if (pm.worm && main && tick('worm', pm.worm.every) && n) {
+        if (pm.worm && main && pm.worm.sweep && tick('worm', pm.worm.every) && n) {
+          // Ver cosmique : il traverse tout le champ sans rien manger.
+          for (let i = 0; i < n; i++) {
+            const c = this.s.plots[i].crop;
+            if (!c) continue;
+            if (c.p < 1) { c.p = 1; c.pest = 0; this.ripen(i); }
+            if (Math.random() < (pm.worm.star || 0)) c.star = true;
+            if (pm.worm.giant && !c.mutant) c.mutant = 'giant';
+          }
+          this.emit('worm-sweep', { from: plotX(0), to: plotX(n - 1) });
+        } else if (pm.worm && main && tick('worm', pm.worm.every) && n) {
           const at = Math.floor(Math.random() * n);
           for (let i = Math.max(0, at - pm.worm.radius); i <= Math.min(n - 1, at + pm.worm.radius); i++) {
             const pl = this.s.plots[i];
             if (i === at) { if (pl.crop) { pl.crop = null; this.addStat('plantsLost'); } continue; }
-            if (pl.crop && pl.crop.p < 1) { pl.crop.p = 1; pl.crop.pest = 0; this.ripen(i); }
+            if (pl.crop && pl.crop.p < 1) { pl.crop.p = 1; pl.crop.pest = 0; this.ripen(i); if (pm.worm.giant && !pl.crop.mutant) pl.crop.mutant = 'giant'; }
           }
           main.x = main.tx = plotX(at); main.pause = 3;
           this.emit('worm', { plot: at });
         }
+
+        if (pm.powers) pm.powers.forEach((pw, k) => { if (tick('pw' + k, pw.every)) this.petPower(pw, r, main); });
 
         if (pm.autoCart && this.cart && !this.cart.done && tick('cart', 2)) {
           if (main) { main.x = main.tx = this.cart.x; main.pause = 2; }
@@ -317,9 +356,78 @@
         }
       },
 
+      // Plantes au hasard (filtre optionnel).
+      randomCrops(k, ok = () => true) {
+        const pool = [];
+        for (let i = 0; i < this.activePlots(); i++) { const c = this.s.plots[i].crop; if (c && ok(c, i)) pool.push(i); }
+        for (let j = pool.length - 1; j > 0; j--) { const m = Math.floor(Math.random() * (j + 1)); [pool[j], pool[m]] = [pool[m], pool[j]]; }
+        return pool.slice(0, k);
+      },
+      makeStars(k) { for (const i of this.randomCrops(k, c => !c.star)) { this.s.plots[i].crop.star = true; this.emit('star', { plot: i }); } },
+
+      // Pouvoirs donnés par la nourriture (voir PET_FOODS dans data.js).
+      petPower(pw, r, main) {
+        const n = this.activePlots();
+        const near = i => !pw.aura || !main || Math.abs(plotX(i) - main.x) <= (pw.radius || (r.pm.aura ? r.pm.aura.radius : 20));
+        const crop = i => this.s.plots[i].crop;
+        switch (pw.kind) {
+          case 'rain': case 'storm': {
+            const w = pw.kind === 'rain' ? 'pluie' : 'orage';
+            if (this.s.clock.weather !== 'orage') { this.s.clock.weather = w; this.s.clock.weatherT = pw.dur || 30; this.emit('weather', { id: w }); }
+            break;
+          }
+          case 'star': this.makeStars(pw.n || 1); break;
+          case 'gold':
+            for (const i of this.randomCrops(pw.n || 1, (c, i) => !c.gold && near(i))) {
+              const c = crop(i);
+              c.gold = true;
+              if (pw.ripen && c.p < 1) c.p = 1;
+              this.emit('golden', { plot: i });
+            }
+            break;
+          case 'ripen':
+            for (const i of this.randomCrops(pw.n || 1, (c, i) => c.p < 1 && !c.pest && near(i))) { crop(i).p = 1; this.ripen(i); }
+            break;
+          case 'boost':
+            for (let i = 0; i < n; i++) { const c = crop(i); if (c && c.p < 1 && !c.pest) { c.p = Math.min(1, c.p + pw.n); if (c.p >= 1) this.ripen(i); } }
+            break;
+          case 'harvestAura': {
+            const R = pw.radius || 30;
+            for (let i = 0; i < n; i++) {
+              const c = crop(i);
+              if (!c || c.p < 1 || c.mutant === 'infini' || c.caught) continue;
+              if (pw.fam && SEED_BY_ID[c.id].fam !== pw.fam) continue;
+              if (!pw.all && main && Math.abs(plotX(i) - main.x) > R) continue;
+              this.harvest(i, 'pet');
+            }
+            break;
+          }
+          case 'plant': for (let i = 0; i < n; i++) if (!crop(i)) this.plant(i); break;
+          case 'water': for (let i = 0; i < n; i++) this.s.plots[i].moist = 1; break;
+          case 'energize':
+            for (const i of this.randomCrops(pw.n || 1, c => c.p >= 1 && !(c.energized > 0))) crop(i).energized = D.STORM.energyTime;
+            break;
+          case 'giant': for (const i of this.randomCrops(pw.n || 1, c => !c.mutant && c.p < 1)) crop(i).mutant = 'giant'; break;
+          case 'cart': if (!this.cart && !this.pm.noCart) { this.cart = { x: plotX(n) + 30, speed: 10, done: false, anim: 0 }; this.emit('cart-arrive'); } break;
+          case 'frenzy': if (!(this.s.clock.frenzyT > 0)) { this.s.clock.frenzyT = 45; this.emit('frenzy', { dur: 45 }); } break;
+          case 'event': if (this.startEvent) this.startEvent(pw.ev); break;
+          case 'crowGold': {
+            for (const c of this.crows) {
+              if (c.state === 'leave') continue;
+              c.state = 'leave';
+              const [i] = this.randomCrops(1, x => !x.gold);
+              if (i != null) { crop(i).gold = true; this.emit('golden', { plot: i }); }
+              this.addStat('crows');
+            }
+            break;
+          }
+        }
+        this.emit('pet-power', { kind: pw.kind, x: main ? main.x : 0 });
+      },
+
       // Renaissance : on garde les animaux (et les emplacements), mais ils reviennent au niveau 0.
       resetPetsForPrestige() {
-        for (const pet of this.s.pets.list) { pet.xp = 0; pet.nodes = {}; pet.path = null; pet.mastery = {}; }
+        for (const pet of this.s.pets.list) { pet.xp = 0; pet.nodes = {}; pet.path = null; pet.mastery = {}; } // la gamelle reste équipée
         this.petRt = {};
       },
     });

@@ -14,6 +14,7 @@
     { id: 'spec', name: 'Spécialisation', icon: 'spec' },
     { id: 'pets', name: 'Compagnon', icon: 'pets' },
     { id: 'marche', name: 'Marché', icon: 'market' },
+    { id: 'usine', name: 'Usine', icon: 'factory' },
     { id: 'prestige', name: 'Renaissance', icon: 'prestige' },
     { id: 'succes', name: 'Succès', icon: 'ach' },
     { id: 'reglages', name: 'Réglages', icon: 'settings' },
@@ -164,7 +165,7 @@
       this.tab = id;
       $('panel').classList.remove('hidden');
       for (const b of $('tabs').children) b.classList.toggle('on', b.dataset.tab === id);
-      $('mult').classList.toggle('hidden', !['champ', 'outils', 'robots', 'spec', 'marche'].includes(id));
+      $('mult').classList.toggle('hidden', !['champ', 'outils', 'robots', 'spec', 'marche', 'usine'].includes(id));
       const body = $('panel-body');
       body.innerHTML = '';
       body.scrollTop = 0;
@@ -176,6 +177,7 @@
       else if (id === 'spec') this.buildSpec(body);
       else if (id === 'pets') this.buildPets(body);
       else if (id === 'marche') this.buildMarket(body);
+      else if (id === 'usine') this.buildFactory(body);
       this.update();
       this.updateHud();
     }
@@ -247,7 +249,8 @@
       else if (this.tab === 'prestige') for (const cat of Object.keys(D.PERK_CATS)) this.renderRows(this.perkBoxes[cat], this.perkItems(cat));
       else if (this.tab === 'spec') for (const b of D.BRANCHES) this.renderRows(this.specBoxes[b.id], this.talentItems(b.id));
       else if (this.tab === 'marche') { this.renderRows(this.mkUps, this.marketItems()); this.renderRows(this.mkStock, this.stockItems()); }
-      else if (this.tab === 'pets') { this.renderRows(this.petPaths, this.petPathItems()); this.renderRows(this.petTree, this.petNodeItems()); this.renderRows(this.petMast, this.petMasteryItems()); this.renderRows(this.petList, this.petItems()); }
+      else if (this.tab === 'usine') { this.renderRows(this.fcBuild, this.factoryItems()); this.renderRows(this.fcStock, this.productItems()); this.renderRows(this.fcFood, this.foodItems()); }
+      else if (this.tab === 'pets') { this.renderRows(this.petFood, this.petFoodItems()); this.renderRows(this.petPaths, this.petPathItems()); this.renderRows(this.petTree, this.petNodeItems()); this.renderRows(this.petMast, this.petMasteryItems()); this.renderRows(this.petList, this.petItems()); }
       void g;
     }
 
@@ -456,6 +459,119 @@
       });
     }
 
+    // Onglet Usine : bâtiment, machines (et leur recette), robots, frigos, améliorations, produits, gamelles.
+    buildFactory(body) {
+      const head = el('div', 'box');
+      const sell = el('button', 'buy gold', 'Tout vendre');
+      sell.onclick = () => { this.game.sellAllProducts(); this.update(); };
+      const bar = el('div', 'set');
+      bar.append(el('span', 'muted', 'Frigos (clic sur un frigo dans l’usine = tout vendre avec le trader)'), sell);
+      this.fcBuild = el('div');
+      this.fcStock = el('div');
+      this.fcFood = el('div');
+      const book = el('div', 'box muted');
+      body.append(head, el('div', 'spec-head', 'Usine, machines et robots'), this.fcBuild, bar, this.fcStock,
+        el('div', 'spec-head', 'Cuisine pour compagnons'), this.fcFood, el('div', 'spec-head', 'Livre de recettes'), book);
+      setHtml(book, D.RECIPES.map(r => `<b>${r.name}</b> (${C.MACHINE_BY_ID[r.machine].name}) : ` + r.inputs.map(i => `${i.n} ${i.seed ? C.SEED_BY_ID[i.seed].name : D.FAMILIES[i.fam].name.toLowerCase()}${i.gold ? ' <span style="color:var(--gold)">doré(e)s</span>' : ''}`).join(' + ') + ` → ${r.out} · valeur ×${r.mult}`).join('<br>'));
+      this.special = () => {
+        const g = this.game, F = D.FACTORY;
+        sell.disabled = !g.fridgeUnits();
+        bar.classList.toggle('hidden', !g.factoryOn());
+        if (!g.factoryUnlocked()) { setHtml(head, `L'usine de transformation se débloque après <b>${F.pr} renaissances</b> (tu en as ${g.prestiges()}). Elle transforme les récoltes des silos en compotes, tartes, glaces, parfums… et en nourriture pour tes compagnons.`); return; }
+        if (!g.factoryOn()) { setHtml(head, 'Construis l’<b>usine</b> : elle prend ses ingrédients dans tes silos (il faut la licence de trading et des silos). Ensuite, clique sur la grange pour passer à l’usine, et sur l’usine pour revenir au champ.'); return; }
+        const staff = [g.lvl('trader_usine') ? `trader de produits (commission ${Math.round(g.factoryCommission() * 100)}%)` : `pas de trader : le grossiste paie ${Math.round(F.wholesale * 100)}%`, g.lvl('gestion_usine') ? 'gestionnaire d’usine' : 'pas de gestionnaire'];
+        const busy = g.s.factory.machines.filter(m => m.st).length;
+        const target = g.s.factory.target ? C.FOOD_BY_ID[g.s.factory.target].name : null;
+        setHtml(head, `Machines : <b>${busy} / ${g.s.factory.machines.length}</b> au travail · lots de ${g.lotSize()} · frigos <b>${fmt(g.fridgeUnits())} / ${fmt(g.fridgeCapacity())}</b> (≈ ${fmt(g.fridgeWorth())} $)<br>${staff.join(' · ')}`
+          + (target ? `<br>Nourriture visée : <b>${target}</b>` : '') + ` <span class="muted">· clique sur l’usine pour revenir au champ</span>`);
+      };
+    }
+
+    factoryItems() {
+      const g = this.game, F = D.FACTORY;
+      const ups = D.UPGRADES.filter(u => u.tab === 'usine');
+      const upRow = u => {
+        const req = Object.entries(u.req || {}).filter(([k, v]) => g.lvl(k) < v).map(([k]) => C.UP_BY_ID[k].name).join(', ');
+        return {
+          key: u.id, icon: S.iconURL(u.id === 'cuisine' ? 'food' : 'factory', 3), title: u.name, level: u.max === 1 ? (g.lvl(u.id) ? 'acquis' : '') : `niv. ${g.lvl(u.id)} / ${u.max}`,
+          desc: u.desc + this.eraNote(u) + (req ? ` <span style="color:var(--bad)">Requiert : ${req}</span>` : ''), locked: !g.eraOk(u) || !g.upReqOk(u.id), buttons: [this.buyButton('up', u.id, u.id === 'usine' ? 'Construire' : 'Acheter')],
+        };
+      };
+      const items = [upRow(ups[0])];
+      if (!g.factoryOn()) return items;
+      for (const m of D.MACHINES) {
+        const cur = g.machineRecipe(m.id);
+        const opts = ['auto', ...D.RECIPES.filter(r => r.machine === m.id).map(r => r.id)];
+        const label = cur === 'auto' ? (g.lvl('gestion_usine') ? 'Auto (gestionnaire)' : 'Auto') : C.RECIPE_BY_ID[cur].name;
+        const n = g.machineCount(m.id);
+        items.push({
+          key: 'mc-' + m.id, icon: S.iconURL('factory', 3), title: m.name, level: `${n} / ${m.max}`,
+          desc: m.desc + ` Vitesse ×${fmt(g.machineSpeed(m.id))}.` + this.eraNote(m), locked: !g.eraOk(m),
+          buttons: [
+            { id: 'rc', label: 'Recette : ' + label, enabled: n > 0, onClick: () => g.setMachineRecipe(m.id, opts[(opts.indexOf(cur) + 1) % opts.length]) },
+            this.buyButton('machine', m.id),
+          ],
+        });
+      }
+      for (const r of D.FACTORY_ROBOTS) items.push({ key: 'fr-' + r.id, icon: S.iconURL('robots', 3), title: r.name, level: `${g.s.factory.robots[r.id] || 0} / ${r.max}`, desc: r.desc, buttons: [this.buyButton('frobot', r.id)] });
+      items.push({ key: 'fridge', icon: S.iconURL('factory', 3), title: 'Frigo', level: `${g.s.factory.fridges} / ${F.fridgeMax}`, desc: `Stocke ${fmt(F.fridgeCap * (1 + 0.5 * g.lvl('frigo_xxl')))} produits transformés. Frigo plein : le grossiste prend le reste.`, buttons: [this.buyButton('fridge', null, 'Installer')] });
+      for (const u of ups.slice(1)) items.push(upRow(u));
+      return items;
+    }
+
+    productItems() {
+      const g = this.game;
+      return Object.entries(g.s.factory.stock).sort((a, b) => g.productWorth(b[1]) - g.productWorth(a[1])).map(([k, e]) => {
+        const r = C.RECIPE_BY_ID[k], f = g.productPrice(k);
+        const fc = e.fresh > 0.7 ? 'var(--ok)' : e.fresh > 0.35 ? 'var(--gold)' : 'var(--bad)';
+        const course = g.lvl('trader_usine') ? `cours ×${(f / D.FACTORY.premium).toFixed(2)}` : 'grossiste';
+        return {
+          key: 'pr-' + k, icon: S.iconURL('food', 3), title: r.name, level: `${fmt(e.units)} unités`,
+          desc: `${course} · fraîcheur <span style="color:${fc}">${Math.round(e.fresh * 100)}%</span> · tout vendre ≈ <b>${fmt(g.productWorth(e))} $</b>`,
+          buttons: [{ id: 'q', label: 'Vendre 25%', enabled: true, onClick: () => g.sellProduct(k, 0.25) }, { id: 'a', label: 'Tout', cls: 'gold', enabled: true, onClick: () => g.sellProduct(k, 1) }],
+        };
+      });
+    }
+
+    foodItems() {
+      const g = this.game;
+      if (!g.factoryUnlocked()) return [];
+      return D.PET_FOODS.map(f => {
+        const r = C.RECIPE_BY_ID[f.recipe], have = g.s.factory.stock[f.recipe];
+        const owned = g.s.pantry[f.id] || 0;
+        const targeted = g.s.factory.target === f.id;
+        const fx = f.special.map(x => `<b>${x.path ? C.PET_BY_ID[D.PETS.find(p => p.paths.some(q => q.id === x.path)).id].paths.find(q => q.id === x.path).name : C.PET_BY_ID[x.pet].name}</b> : ${x.desc}`).join('<br>');
+        return {
+          key: 'fd-' + f.id, icon: S.iconURL('food', 3), title: f.name, level: owned ? `${owned} au placard` : '',
+          desc: `${f.units} × ${r.name} (${have ? fmt(have.units) : 0} au frigo) + frais ≈ ${fmt(g.foodFee(f.id) || 0)} $. Pour tous : ${f.any.desc}<br>${fx}`,
+          buttons: [
+            { id: 't', label: targeted ? 'Visée ✓' : 'Viser', enabled: g.lvl('gestion_usine') > 0, tip: 'Le gestionnaire d’usine fait pousser, fabriquer puis cuisiner cette gamelle.', onClick: () => g.setFoodTarget(targeted ? null : f.id) },
+            { id: 'c', label: 'Cuisiner', cls: 'gold', enabled: g.canCraftFood(f.id), onClick: () => g.craftFood(f.id) },
+          ],
+        };
+      });
+    }
+
+    // Gamelles : celle du compagnon choisi, et celles du placard.
+    petFoodItems() {
+      const g = this.game, pet = g.s.pets.list[this.petSlot];
+      if (!pet || !g.factoryUnlocked()) return [];
+      const items = [];
+      for (const f of D.PET_FOODS) {
+        const owned = g.s.pantry[f.id] || 0, on = pet.food === f.id;
+        if (!owned && !on) continue;
+        const eff = g.foodEffectFor(pet, f.id);
+        const special = eff !== f.any;
+        items.push({
+          key: 'pf-' + pet.uid + f.id, icon: S.iconURL('food', 3), title: f.name + (on ? ' (équipée)' : ''), level: owned ? `${owned} au placard` : '',
+          desc: (special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc,
+          buttons: [on ? { id: 'e', label: 'Retirer', enabled: true, onClick: () => g.equipFood(pet, null) } : { id: 'e', label: 'Donner', cls: 'gold', enabled: owned > 0, onClick: () => g.equipFood(pet, f.id) }],
+        });
+      }
+      if (!items.length) items.push({ key: 'pf-none', icon: S.iconURL('food', 3), title: 'Aucune gamelle', desc: 'Cuisine des gamelles à l’usine (onglet Usine, « Cuisine pour animaux ») : chacune change les capacités de ton compagnon tant qu’il la porte.', buttons: [] });
+      return items;
+    }
+
     // Onglet Compagnons : un emplacement par renaissance ; on choisit un emplacement pour voir son arbre ou y adopter.
     buildPets(body) {
       const head = el('div', 'box');
@@ -468,13 +584,17 @@
       this.petMast = el('div');
       this.petListHead = el('div', 'spec-head');
       this.petList = el('div');
-      body.append(head, this.petSlotsBox, this.petPathHead, this.petPaths, this.petTreeHead, this.petTree, this.petMastHead, this.petMast, this.petListHead, this.petList);
+      this.petFoodHead = el('div', 'spec-head');
+      this.petFood = el('div');
+      body.append(head, this.petSlotsBox, this.petFoodHead, this.petFood, this.petPathHead, this.petPaths, this.petTreeHead, this.petTree, this.petMastHead, this.petMast, this.petListHead, this.petList);
       this.petSlot = Math.min(this.petSlot || 0, this.game.petSlots() - 1);
       this.special = () => {
         const g = this.game;
         this.renderPetSlots();
         const pet = g.s.pets.list[this.petSlot];
         this.petTreeHead.classList.toggle('hidden', !pet);
+        this.petFoodHead.classList.toggle('hidden', !pet || !g.factoryUnlocked());
+        setHtml(this.petFoodHead, '<b>Nourriture</b> <span class="muted">— active tant qu’elle est équipée</span>');
         this.petMastHead.classList.toggle('hidden', !pet || !pet.path);
         setHtml(this.petListHead, pet ? 'Remplacer ce compagnon <span class="muted">(sa progression sera perdue)</span>' : 'Adopter un compagnon dans cet emplacement');
         if (!pet) {
@@ -674,6 +794,11 @@
       op.onchange = () => api.setSetting('opacity', +op.value);
       line('Opacité', op);
 
+      const fps = el('select');
+      for (const [v, l] of [[15, 'Fluide (15 images/s)'], [10, 'Équilibrée (10 images/s)'], [5, 'Sobre (5 images/s)']]) { const o = el('option', null, l); o.value = v; if (v === (s.fps || 10)) o.selected = true; fps.appendChild(o); }
+      fps.onchange = () => api.setSetting('fps', +fps.value);
+      line('Animation', fps, 'Moins d’images par seconde = moins de processeur. Le jeu avance pareil.');
+
       const al = el('input'); al.type = 'checkbox'; al.checked = !!s.autoLaunch;
       al.onchange = () => api.setSetting('autoLaunch', al.checked);
       line('Lancer au démarrage de Windows', al, 'Fonctionne avec la version installée (.exe).');
@@ -764,6 +889,13 @@
       if (!hit) { if (!this.tipEl) this.hideTip(); return; }
       let html = '';
       if (hit.type === 'cart') html = '<b>Marchand ambulant</b> · clique pour commercer !';
+      else if (hit.type === 'barn') html = g.factoryOn() ? '<b>Grange</b> · clic : aller à l’usine' : '<b>Grange</b> · l’usine de transformation peut être construite (onglet Usine)';
+      else if (hit.type === 'factory-exit') html = '<b>Usine</b> · clic : retour au champ';
+      else if (hit.type === 'fridge') html = `<b>Frigos</b> · ${fmt(g.fridgeUnits())} / ${fmt(g.fridgeCapacity())} produits · ≈ <b>${fmt(g.fridgeWorth())} $</b><br>` + (g.lvl('trader_usine') ? 'Clic : tout vendre au cours' : 'Clic : onglet Usine');
+      else if (hit.type === 'machine') {
+        const m = g.s.factory.machines[hit.i], r = m && m.lot && C.RECIPE_BY_ID[m.lot.id];
+        html = `<b>${C.MACHINE_BY_ID[m.type].name}</b> · ` + (m.st === 2 ? `${r.name} : ${Math.round(m.t / r.time * 100)}%` : m.st === 1 ? `${r.name} : en attente des ingrédients (porteur)` : 'à l’arrêt : il manque des ingrédients dans les silos (ou le tapis est plein)');
+      }
       else if (hit.type === 'silo') {
         html = `<b>Silos</b> · ${fmt(g.stockUnits())} / ${fmt(g.siloCapacity())} unités · valeur au cours ≈ <b>${fmt(g.stockWorth())} $</b><br>Clic : tout vendre`;
       }
@@ -896,6 +1028,11 @@
           case 'cry': r.addFx('cry', e.x); break;
           case 'cry-blocked': r.addFloater(e.x, '!', '#ff7b6b', true); break;
           case 'worm': r.addFx('worm', C.plotX(e.plot)); break;
+          case 'worm-sweep': r.addFx('sweep', e.from, e.to); this.toast('Le ver cosmique traverse tout le champ !', 'gold'); break;
+          case 'food-crafted': this.toast(`Gamelle prête : ${C.FOOD_BY_ID[e.id].name} (onglet Compagnon pour la donner)`, 'gold'); break;
+          case 'food-target-done': this.toast(`Le gestionnaire d’usine a cuisiné : ${C.FOOD_BY_ID[e.id].name}`, 'gold'); break;
+          case 'pet-power': r.addFx('puff', e.x); break;
+          case 'product-rotten': this.toast(`${C.RECIPE_BY_ID[e.id].name} : ${fmt(e.units)} produits ont tourné au frigo`); break;
           case 'cheshire': r.addFx('puff', C.plotX(e.plot)); break;
           case 'gem': r.addFloater(e.plot, '+' + fmt(e.value), '#7fe3ff'); this.toast('Une gemme déterrée !', 'gold', 'gem'); break;
           case 'pet-adopt': this.toast(`Tu as adopté : ${C.PET_BY_ID[e.id].name} !`, 'gold'); break;

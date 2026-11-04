@@ -1,0 +1,33 @@
+// Usine en marche et compagnon nourri : npm start -- --farm-shots --farm-demo=tools/demo-factory.js
+(() => {
+  const { game: g, renderer: r } = FARM_APP;
+  const D = FARM_DATA;
+  g.s.stats.prestiges = 17;
+  g.s.money = 1e60;
+  g.s.market.unlocked = true;
+  for (let i = 0; i < 16; i++) g.buy('plot');
+  g.buy('up', 'licence');
+  for (let i = 0; i < 4; i++) g.buy('silo');
+  for (const id of ['usine', 'cuisine', 'trader_usine', 'gestion_usine']) g.buy('up', id);
+  for (const m of ['marmite', 'marmite', 'four', 'presse', 'sorbetiere', 'chocolaterie', 'alambic']) g.buy('machine', m);
+  g.buy('frobot', 'porteur', 3); g.buy('frobot', 'cuistot', 2);
+  g.buy('fridge'); g.buy('fridge');
+  for (const sd of D.SEEDS) if (g.eraOk(sd)) g.s.seeds[sd.id] = true;
+  const put = (seed, n, gold) => { g.s.trade.stock[seed + (gold ? '|dore' : '|')] = { seed, traits: gold ? ['dore'] : [], units: n, worth: 1e20, fresh: 1 }; };
+  for (const id of ['fraise', 'framboise', 'ble', 'tournesol', 'cacao', 'rose', 'salade', 'carotte', 'cosmique']) put(id, 400);
+  put('fraise', 50, true);
+  g.s.factory.stock.glace = { id: 'glace', units: 40, worth: 1e21, fresh: 1 };
+  g.s.factory.stock.tarte = { id: 'tarte', units: 25, worth: 1e21, fresh: 0.6 };
+  g.craftFood('gl_glace');
+  g.adoptPet('poussin');
+  const pet = g.s.pets.list[0];
+  pet.xp = 1e9;
+  for (let k = 0; k < 30; k++) for (const n of D.PETS[0].nodes) g.buyPetNode(pet, n.id);
+  g.choosePath(pet, 'phenix');
+  g.equipFood(pet, 'gl_glace');
+  g.s.factory.target = 'gl_tarte_cosmique';
+  for (let t = 0; t < 40; t += 0.25) g.tick(0.25);
+  g.view = 'factory';
+  r.fitCanvas(); r.dirty();
+  FARM_APP.ui.buildSeedbar();
+})();

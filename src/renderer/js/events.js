@@ -16,6 +16,7 @@
       // Conditions d'apparition des événements.
       eventAllowed(id) {
         const c = this.s.clock, w = this.weather();
+        if (id === 'touristes' && this.pm.noTourists) return false;
         switch (D.EVENTS[id].when) {
           case 'night': return this.isNight();
           case 'day': return !this.isNight();

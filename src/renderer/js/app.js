@@ -90,6 +90,11 @@
     else if (hit.type === 'swarm') game.disperseSwarm();
     else if (hit.type === 'thief') game.catchThief();
     else if (hit.type === 'silo') game.sellAll();
+    else if (hit.type === 'barn') { if (game.factoryOn()) { game.view = 'factory'; renderer.fitCanvas(); } else ui.openTab('usine'); }
+    else if (hit.type === 'factory-exit') { game.view = 'farm'; renderer.fitCanvas(); }
+    else if (hit.type === 'fridge') game.lvl('trader_usine') ? game.sellAllProducts() : ui.openTab('usine');
+    else if (hit.type === 'machine') ui.openTab('usine');
+    renderer.dirty();
     ui.sceneTip(sceneHit(e), e.clientX);
   });
   window.addEventListener('contextmenu', e => { e.preventDefault(); if (game.brush) { game.brush = null; ui.refreshSeedbar(); } });
@@ -97,26 +102,30 @@
     if (e.key === 'Escape') { if (game.brush) { game.brush = null; ui.refreshSeedbar(); } else ui.closePanel(); }
   });
 
-  // ---------- Boucles ----------
-  // Simulation sur un minuteur (continue quand la fenêtre est masquée), rendu sur requestAnimationFrame.
+  // ---------- Boucles (sobres : c'est un jeu qui tourne toute la journée) ----------
+  // Simulation à 5 Hz (continue quand la fenêtre est masquée), rendu à 5-15 images/s (réglage Animation) seulement quand la ferme est visible.
+  const TICK_MS = 200, STEP = 0.25;
+  const fps = () => (ui.settings && ui.settings.fps) || 10;
   let last = performance.now();
   setInterval(() => {
     const now = performance.now();
     let dt = Math.min(5, (now - last) / 1000);
     last = now;
-    while (dt > 0) { const step = Math.min(0.1, dt); game.tick(step); dt -= step; }
+    while (dt > 0) { const step = Math.min(STEP, dt); game.tick(step); dt -= step; }
     ui.handleEvents();
-  }, 50);
+  }, TICK_MS);
 
   let lastFrame = performance.now();
-  function frame(now) {
-    const dt = Math.min(0.1, (now - lastFrame) / 1000);
+  function frame() {
+    const now = performance.now();
+    const dt = Math.min(0.25, (now - lastFrame) / 1000);
     lastFrame = now;
-    renderer.draw(dt);
-    requestAnimationFrame(frame);
+    setTimeout(frame, 1000 / fps());
+    if (!document.hidden) renderer.draw(dt);
   }
 
-  setInterval(() => { ui.updateHud(); ui.update(); }, 250);
+  // HUD 2×/s ; le panneau (DOM coûteux) seulement quand il est ouvert.
+  setInterval(() => { if (document.hidden) return; ui.updateHud(); if (ui.tab) ui.update(); }, 500);
   setInterval(() => save(false), 5000);
   window.addEventListener('beforeunload', () => save(true));
   window.addEventListener('resize', () => renderer.resize(renderer.scale, ui.hudRight()));
@@ -126,7 +135,7 @@
   api.getSettings().then(s => {
     applySettings(s);
     ui.updateHud();
-    requestAnimationFrame(frame);
+    frame();
     if (!saved) ui.toast('Bienvenue ! Ton fermier cultive tout seul. Clique sur les plantes pour l\'aider, ouvre la boutique à gauche.', 'gold');
   });
 })(this);

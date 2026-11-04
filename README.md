@@ -9,6 +9,9 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 - 9 compagnons (dont 4 légendaires) avec arbre de talents, évolution, 3 voies chacun et une maîtrise
 - Un marché vivant : silos, cours, pénuries, krachs, commandes, produits qui s'abîment
 - Météo (8 temps), orages et éclairs, 13 événements aléatoires, 8 mutations, cultures denses
+- Une **usine de transformation** (fin de partie) : 6 machines, 17 recettes, tapis, robots, frigos, trader et gestionnaire
+- **16 gamelles** pour les compagnons et **63 combinaisons spéciales** qui changent vraiment leur façon de jouer
+- Ultra sobre : environ **2 % d'un cœur** et 250 Mo, rendu en 5 à 15 images/s au choix
 - 32 talents de renaissance, 85 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
 - Sauvegarde 100 % automatique, compatible avec un dossier synchronisé (NAS, cloud)
 
@@ -33,6 +36,8 @@ La ferme apparaît en bas de l'écran, juste au-dessus de la barre des tâches.
 | **Clic** sur un corbeau, un sanglier, un voleur, une nuée | Le chasser (et souvent gagner une récompense) |
 | **Clic** sur un compagnon | Le caresser (+XP) |
 | **Clic** sur le silo | Tout vendre au marché |
+| **Clic** sur la grange / l'usine | Passer du champ à l'usine, et revenir (après 13 renaissances) |
+| **Clic** sur un frigo de l'usine | Tout vendre au cours (avec le trader de produits) |
 | **Clic droit** ou **Échap** | Lâcher le pinceau / fermer le panneau |
 
 ---
@@ -89,6 +94,7 @@ Dès 10 M$ gagnés dans une partie, le marché ouvre. Les récoltes partent dans
 
 - Les **cours** bougent sans cesse, plus fort sur les légumes bon marché. Des **pénuries** (cours ×6 à ×25) et des **krachs** frappent au hasard.
 - Les **commandes** (bio, sans OGM, résistant au froid…) paient à parité avec ton meilleur légume : de quoi rendre le blé ou les carottes rentables en fin de partie. Le prix reste plafonné à 3× la rentabilité de ton meilleur légume.
+- Les **légumes dorés** sont un produit à part, avec leur propre cours (plus nerveux), et certaines recettes de l'usine en demandent.
 - Les produits **s'abîment** : la salade et les champignons pourrissent vite, le blé et les pommes de terre se gardent des heures. Chambre froide et conserverie ralentissent l'usure, et un voleur peut s'en prendre à tes silos.
 
 ![Marché](docs/img/marche.png)
@@ -115,6 +121,40 @@ Et de temps en temps, un événement aléatoire :
 | Touristes | Cueillent tes plantes mûres et les paient ×3 |
 | Champignons sauvages | Poussent tout seuls après la pluie |
 
+### Usine de transformation (après 13 renaissances)
+
+Un pan de fin de partie, long à maximiser. Une fois l'**usine** construite (onglet Usine), un clic sur la grange fait passer la bande à l'usine ; un clic sur l'usine ramène au champ. La ferme continue de tourner pendant ce temps, et les compagnons restent toujours dans le champ.
+
+![L'usine](docs/img/usine-scene.png)
+
+- Les **ingrédients** viennent de tes silos. Un manutentionnaire (lent), puis des **robots porteurs**, les apportent du quai aux machines.
+- **6 machines** se débloquent peu à peu (marmite, four à pain, presse, sorbetière, chocolaterie, alambic) et font **17 recettes** : compote, confiture, soupe, sirop, pain, tarte, gâteau, tarte au chou cosmique, jus, huile, glace, chocolat, parfum, élixir… dont des recettes **dorées** (confiture dorée, sorbet doré, truffes au chocolat, élixir) qui demandent des légumes dorés et valent bien plus. Chaque machine peut être réglée sur une recette, ou sur « Auto ».
+- Les produits finis glissent sur le **tapis roulant** jusqu'aux **frigos**. Quand ils sont pleins, le grossiste rachète le surplus à prix fixe. Les produits s'abîment aussi, plus lentement que les légumes.
+- **Robots cuistots** (machines plus rapides), **robots emballeurs** (produits plus chers), et une longue liste d'améliorations : tapis, quai, thermostats, grandes cuves (lots plus gros), recettes de grand-mère, frigos XXL, isolation.
+- Le **trader de produits** donne accès au marché des produits transformés, dont les cours bougent ; sans lui, seul le grossiste achète. Le **gestionnaire d'usine** choisit la recette la plus rentable pour les machines en « Auto ». Avec la **coordination champ-usine**, il fait aussi planter par le gestionnaire de champ les ingrédients qui lui manquent.
+
+![Onglet Usine](docs/img/usine.png)
+
+### Nourriture des compagnons
+
+Avec la **cuisine pour animaux**, les produits du frigo deviennent des **gamelles**. Une gamelle coûte des produits et des frais. Tu la donnes au compagnon de ton choix, onglet Compagnon : elle agit **tant qu'elle est équipée**. Si tu la retires, l'effet s'arrête et la gamelle revient au placard. Les gamelles et celles qui sont équipées sont gardées à la renaissance.
+
+Chaque gamelle a un effet pour tous, et surtout des **effets spéciaux** selon le compagnon ou sa voie, souvent un peu fous :
+
+| Gamelle | Exemples d'effets spéciaux |
+|---|---|
+| Coupe glacée | **Phénix givré** : son aura n'assèche plus, elle humidifie et fait pousser 60 % plus vite. **Harfang polaire** : une averse toutes les 90 s. |
+| Tarte au chou cosmique | **Ver cosmique** : il traverse tout le champ, fait tout mûrir sans rien manger, et 1 plante sur 10 devient étoilée. **Basilic stellaire** : chaque cri crée une étoile. |
+| Huile | **Phénix à l'huile** : aura en feu, croissance ×2 mais la terre sèche 10× plus vite. **Dragon-dynamo** : il énergise des plantes (×100). |
+| Confiture | **Frelons collants** : les corbeaux englués se changent en légumes dorés. |
+| Élixir | **Ver géant** : tout ce qu'il fait mûrir devient géant. **Wyverne enragée** : un rugissement toutes les 10 s. |
+| Parfum | **Renard musqué** : les sangliers le suivent et labourent : toutes les parcelles vides se plantent. |
+| Gâteau, soupe, chocolat… | Foires agricoles, touristes, comètes, éclipses ou arcs-en-ciel à la demande, meutes plus grandes, chat noir porte-bonheur… |
+
+Avec le gestionnaire d'usine, tu peux **viser** une gamelle : il fait pousser les ingrédients, fabrique le produit puis cuisine la gamelle tout seul.
+
+![Nourriture](docs/img/pets-food.png)
+
 ### Renaissance
 
 Une fois le **seuil** atteint (300 M$ gagnés dans la partie la première fois, environ ×10 à chaque renaissance), tu peux renaître : la ferme repart de zéro contre des **graines d'or**. Elles donnent +1 % de revenus chacune et s'échangent contre des **talents de renaissance** ciblés : argent et parcelles de départ, graine débloquée d'avance, robots d'une génération, une famille de légumes, la pluie, les événements heureux, les compagnons, le commerce…
@@ -125,7 +165,9 @@ Les graines d'or sont rares : aller bien au-delà du seuil en rapporte un peu pl
 
 ### Succès et réglages
 
-85 succès, chacun +2 % de revenus. Dans les **réglages** : écran, taille, opacité, lancement au démarrage de Windows, raccourci clavier, dossier de sauvegarde.
+85 succès, chacun +2 % de revenus. Dans les **réglages** : écran, taille, opacité, **animation** (15, 10 ou 5 images/s : moins d'images = moins de processeur, le jeu avance pareil), lancement au démarrage de Windows, raccourci clavier, dossier de sauvegarde.
+
+Le jeu est conçu pour tourner toute la journée : simulation à 5 Hz, décor redessiné 4 fois par seconde, sprites mis en cache, canvas limité à la partie dessinée, rendu en pause quand la ferme est masquée, pas d'accélération GPU. Mesuré : environ 2 % d'un cœur et 250 Mo.
 
 ---
 
@@ -159,9 +201,11 @@ node tools/test-market.js   # marché
 node tools/test-storm.js    # orages
 node tools/test-dense.js    # cultures denses et miniaturisation
 node tools/test-giant.js    # les 8 mutations
+node tools/test-factory.js  # usine, légumes dorés à part, gamelles (576 combinaisons compagnon × voie × gamelle), pouvoirs
 node tools/sim-life.js 200 20       # partie complète simulée : 20 renaissances, au plus 200 h
 npm run sim -- 6 50 bota+bio+trade  # une seule partie (branches, +trade = marché)
 npm start -- --farm-savetest        # dossier de sauvegarde et conflits (dossier temporaire)
+npm start -- --farm-perf --farm-demo=tools/demo-factory.js   # CPU et mémoire sur 30 s, temps de rendu / simulation
 npm start -- --farm-shots --farm-demo=tools/demo-v4.js   # captures de chaque onglet dans tools/shots
 python tools/readme-shots.py        # recadre tools/shots pour docs/img
 ```
@@ -191,6 +235,8 @@ Presque tout se trouve dans [src/renderer/js/data.js](src/renderer/js/data.js) :
 | Culture dense | `DENSE` | Plants, `costMult`, `growth`. |
 | Mutation | `MUTATIONS` | `value`, `harvest`, `growth`, `fail`, `mold`, `infinite`, `catcher`, `good`. |
 | Succès | `ACHIEVEMENTS` | `check: g => …` (`g.s` = état sauvegardé). |
+| Usine | `FACTORY`, `MACHINES`, `RECIPES`, `FACTORY_ROBOTS`, améliorations `tab: 'usine'` | Prix en multiples de `FACTORY.base`. Recette : `inputs: [{ fam \| seed, n, gold }]`, `out`, `time`, `mult`, `shelf`. Logique dans [factory.js](src/renderer/js/factory.js), sprites `drawMachine` (un dessin par machine dans `MACHINE_DRAW`). |
+| Gamelle | `PET_FOODS` | `recipe`, `units`, effet `any` + `special: [{ pet \| path, desc, mods(pm) }]`. Les pouvoirs périodiques (`powers` : pluie, étoiles, dorés, maturation, plantation, événements…) sont exécutés par `petPower` de pets.js. |
 | Renaissance | `PRESTIGE` | Seuils `thresholds` (calibrés, ×1000 par renaissance au-delà), gain `gsBase × (gagné / seuil)^gsExp`, emplacements de compagnons. Les légumes d'une ère coûtent `ECO.eraMult` × le seuil précédent. |
 
 ### Structure
@@ -203,6 +249,7 @@ src/renderer/js/core.js     la logique (sans DOM, réutilisée par les tests et 
 src/renderer/js/pets.js     compagnons (emplacements, arbres, voies, maîtrise)
 src/renderer/js/market.js   silos, cours, commandes, fraîcheur, trader, gestionnaire
 src/renderer/js/events.js   événements aléatoires et effets de la météo
+src/renderer/js/factory.js  usine : machines, porteurs, tapis, frigos, produits, gamelles
 src/renderer/js/sprites.js  pixel art dessiné en code
 src/renderer/js/render.js   rendu de la bande
 src/renderer/js/ui.js       HUD, panneau, info-bulles, notifications

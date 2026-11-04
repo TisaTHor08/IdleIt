@@ -10,11 +10,16 @@ const ART_H = 20;    // hauteur de la bande en pixels "art" ; scale = pixels phy
 // et hors du dossier d'installation, donc une mise à jour par l'installeur ne touche jamais la sauvegarde.
 app.setPath('userData', path.join(app.getPath('appData'), 'IdleIt Ferme'));
 // Mode capture (tests visuels) : dossier temporaire pour ne jamais toucher à la vraie sauvegarde.
-if (process.argv.includes('--farm-shots') || process.argv.includes('--farm-savetest')) app.setPath('userData', path.join(app.getPath('temp'), 'idleit-shots-' + Date.now()));
+if (['--farm-shots', '--farm-savetest', '--farm-perf'].some(f => process.argv.includes(f))) app.setPath('userData', path.join(app.getPath('temp'), 'idleit-shots-' + Date.now()));
+
+// Sobriété : une bande de 40 px n'a pas besoin du GPU (un processus et ~100 Mo de moins, rendu logiciel suffisant).
+app.disableHardwareAcceleration();
+// Mémoire : tas JavaScript compact (le jeu n'a besoin que de quelques Mo).
+app.commandLine.appendSwitch('js-flags', '--optimize-for-size --max-old-space-size=128');
 
 const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json');
 // saveDir : dossier de la partie (null = dossier utilisateur). Les réglages, eux, restent toujours propres à ce PC.
-const DEFAULT_SETTINGS = { displayId: null, opacity: 1, scale: 2, autoLaunch: false, hotkey: 'Control+Alt+F', saveDir: null };
+const DEFAULT_SETTINGS = { displayId: null, opacity: 1, scale: 2, autoLaunch: false, hotkey: 'Control+Alt+F', saveDir: null, fps: 10 };
 let settings = { ...DEFAULT_SETTINGS };
 let win = null;
 let tray = null;
@@ -131,6 +136,38 @@ function createWindow() {
       ok(await js('FARM_APP.game.s.money') >= 12345, 'la partie du dossier est chargée');
       ok(JSON.parse(fs.readFileSync(path.join(B, 'save.json'), 'utf8')).money === 778, "l'ancien dossier n'a pas été écrasé pendant le changement");
       fs.rmSync(tmp, { recursive: true, force: true });
+      app.quit();
+    });
+  }
+  // --farm-perf : mesure le CPU et la mémoire de tous les processus pendant 30 s (après 10 s de chauffe), puis quitte.
+  if (process.argv.includes('--farm-perf')) {
+    win.setOpacity(0.01);
+    win.webContents.once('did-finish-load', async () => {
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      const demo = process.argv.find(a => a.startsWith('--farm-demo='));
+      if (demo) await win.webContents.executeJavaScript(fs.readFileSync(demo.slice('--farm-demo='.length), 'utf8'));
+      await wait(10000);
+      // Temps passé dans le rendu, la simulation et l'interface (ms par seconde).
+      await win.webContents.executeJavaScript(`(() => {
+        const P = window.__perf = { draw: 0, tick: 0, ui: 0, n: 0 };
+        const wrap = (o, k, key) => { const f = o[k].bind(o); o[k] = (...a) => { const t = performance.now(); const r = f(...a); P[key] += performance.now() - t; if (key === 'draw') P.n++; return r; }; };
+        wrap(FARM_APP.renderer, 'draw', 'draw');
+        P.fn = {};
+        for (const k of Object.keys(FARM_SPRITES)) if (typeof FARM_SPRITES[k] === 'function' && k !== 'px') { const f = FARM_SPRITES[k]; FARM_SPRITES[k] = (...a) => { const t = performance.now(); const r = f(...a); P.fn[k] = (P.fn[k] || 0) + performance.now() - t; return r; }; }
+        for (const k of ['drawWeather', 'drawNight', 'drawFloaters', 'drawFx']) wrap(FARM_APP.renderer, k, 'r_' + k), P['r_' + k] = 0; wrap(FARM_APP.game, 'tick', 'tick'); wrap(FARM_APP.ui, 'updateHud', 'ui'); wrap(FARM_APP.ui, 'handleEvents', 'ui');
+      })()`);
+      const samples = [];
+      for (let i = 0; i < 30; i++) {
+        await wait(1000);
+        const m = app.getAppMetrics();
+        samples.push({ cpu: m.reduce((a, p) => a + p.cpu.percentCPUUsage, 0), mem: m.reduce((a, p) => a + p.memory.workingSetSize, 0) / 1024,
+          by: m.map(p => p.type + ':' + p.cpu.percentCPUUsage.toFixed(1)).join(' ') });
+      }
+      const avg = k => samples.reduce((a, s) => a + s[k], 0) / samples.length;
+      const P = await win.webContents.executeJavaScript('window.__perf');
+      console.log('perf : détail ' + JSON.stringify(Object.fromEntries(Object.entries({ ...P.fn, ...Object.fromEntries(Object.entries(P).filter(([k]) => k.startsWith('r_'))) }).map(([k, v]) => [k, +(v / 30).toFixed(2)]).sort((a, b) => b[1] - a[1]).slice(0, 12))));
+      console.log(`perf : rendu ${(P.draw / 30).toFixed(1)} ms/s (${(P.n / 30).toFixed(1)} images/s) · simulation ${(P.tick / 30).toFixed(1)} ms/s · interface ${(P.ui / 30).toFixed(1)} ms/s`);
+      console.log(`perf : CPU ${avg('cpu').toFixed(2)} % (somme des processus, en % d'un cœur) · mémoire ${avg('mem').toFixed(0)} Mo · ${samples[samples.length - 1].by}`);
       app.quit();
     });
   }

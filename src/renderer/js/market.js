@@ -76,6 +76,8 @@
 
       // ---------- Cours ----------
       trend(seedId) { return (this.s.trade.trend[seedId] || 1) * this.shockMult(seedId); },
+      // Les légumes dorés sont un produit à part : leur cours (clé « graine* ») bouge indépendamment.
+      entryTrend(e) { return e.traits.includes('dore') ? (this.s.trade.trend[e.seed + '*'] || 1) : this.trend(e.seed); },
       shockMult(seedId) { let m = 1; for (const k of this.s.trade.shocks) if (k.seed === seedId) m *= k.mult; return m; },
       shockFor(seedId) { return this.s.trade.shocks.find(k => k.seed === seedId) || null; },
       // Cours affiché d'une espèce (prime du marché × aléa × chocs × saturation), hors commandes.
@@ -133,7 +135,7 @@
         const d = this.demandFor(e);
         const du = d ? Math.min(units, d.left) : 0;
         const sat = this.saturation(e.seed, units / 2);
-        const f = M.premium * this.trend(e.seed) * sat * this.fxMul('price', { fam: SEED_BY_ID[e.seed].fam }) * (units ? (du * (d ? d.mult : 1) + (units - du)) / units : 1);
+        const f = M.premium * this.entryTrend(e) * sat * this.fxMul('price', { fam: SEED_BY_ID[e.seed].fam }) * (units ? (du * (d ? d.mult : 1) + (units - du)) / units : 1);
         return Math.min(f, this.priceCap(e.seed));
       },
 
@@ -142,7 +144,7 @@
         const e = tr.stock[key];
         if (!e) return 0;
         const units = Math.min(e.units, fraction >= 1 ? e.units : Math.max(1, Math.floor(e.units * fraction)));
-        const base = e.worth * e.fresh * M.premium * this.trend(e.seed) * this.fxMul('price', { fam: SEED_BY_ID[e.seed].fam });
+        const base = e.worth * e.fresh * M.premium * this.entryTrend(e) * this.fxMul('price', { fam: SEED_BY_ID[e.seed].fam });
         let total = 0, rest = units;
         const d = this.demandFor(e);
         if (d) {
@@ -190,6 +192,11 @@
             let x = (tr.trend[sd.id] || 1) * Math.exp(gauss() * lerp(M.trendVol, c));
             x += (1 - x) * M.trendPull;
             tr.trend[sd.id] = Math.max(M.trendMin, Math.min(lerp(M.trendMax, c), x));
+            if (!this.s.seeds[sd.id]) continue;
+            // Cours des légumes dorés : plus nerveux, entre ×0.3 et ×4.
+            let y = (tr.trend[sd.id + '*'] || 1) * Math.exp(gauss() * M.goldVol);
+            y += (1 - y) * M.trendPull;
+            tr.trend[sd.id + '*'] = Math.max(M.goldTrend[0], Math.min(M.goldTrend[1], y));
           }
         }
         if (!this.marketOn()) return;
