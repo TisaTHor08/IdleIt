@@ -6,7 +6,7 @@ const fs = require('fs');
 const PANEL_H = 340; // espace au-dessus de la bande pour le panneau, les bulles et les notifications
 const ART_H = 20;    // hauteur de la bande en pixels "art" ; scale = pixels physiques par pixel art (2 -> 40 px)
 
-// Dossier de données fixe (%APPDATA%\IdleIt Ferme) : identique en dev, en portable et en version installée,
+// Dossier de données fixe (%APPDATA%\IdleIt Ferme, nom historique gardé depuis le passage à « Farmling » pour ne perdre aucune partie) : identique en dev, en portable et en version installée,
 // et hors du dossier d'installation, donc une mise à jour par l'installeur ne touche jamais la sauvegarde.
 app.setPath('userData', path.join(app.getPath('appData'), 'IdleIt Ferme'));
 // Mode capture (tests visuels) : dossier temporaire pour ne jamais toucher à la vraie sauvegarde.
@@ -208,7 +208,7 @@ function createTray() {
   if (img.isEmpty()) img = nativeImage.createEmpty();
   else img = img.resize({ width: 16, height: 16 });
   tray = new Tray(img);
-  tray.setToolTip('IdleIt Ferme');
+  tray.setToolTip('Farmling');
   const send = tab => () => { if (!win.isVisible()) toggleVisible(); win.webContents.send('open-tab', tab); };
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Afficher / masquer', click: toggleVisible },
@@ -227,6 +227,8 @@ if (!TEST_MODE && !app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     loadSettings();
+    // Le lancement auto pointe vers l'exécutable actuel (il s'appelle Farmling.exe depuis le changement de nom).
+    if (settings.autoLaunch && app.isPackaged) app.setLoginItemSettings({ openAtLogin: true });
     createWindow();
     createTray();
     registerHotkey();
@@ -367,7 +369,7 @@ function setupAutoUpdate() {
   autoUpdater.on('update-available', info => {
     if (!portable || notified === info.version || !tray) return;
     notified = info.version;
-    tray.displayBalloon({ title: 'IdleIt Ferme ' + info.version + ' disponible',
+    tray.displayBalloon({ title: 'Farmling ' + info.version + ' disponible',
       content: 'Clique ici pour télécharger la nouvelle version portable.', iconType: 'info' });
     tray.once('balloon-click', () => shell.openExternal(RELEASES_URL));
   });

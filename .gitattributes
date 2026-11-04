@@ -1,0 +1,5 @@
+# Fichiers lus dans le conteneur Linux du wiki : fins de ligne Unix
+wiki/Dockerfile text eol=lf
+wiki/nginx.conf text eol=lf
+wiki/docker-compose.yml text eol=lf
+.dockerignore text eol=lf

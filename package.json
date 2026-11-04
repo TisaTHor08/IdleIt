@@ -1,10 +1,10 @@
 {
   "name": "idleit",
-  "productName": "IdleIt Ferme",
-  "version": "0.12.0",
+  "productName": "Farmling",
+  "version": "0.13.0",
   "description": "Idle game de ferme miniature qui vit au-dessus de la barre des tâches.",
   "main": "src/main.js",
-  "author": "IdleIt",
+  "author": "TisaTHor08",
   "license": "MIT",
   "scripts": {
     "start": "node tools/start.js",
@@ -12,6 +12,10 @@
     "sim": "node tools/sim.js",
     "icon": "node tools/make-icon.js",
     "save-editor": "node tools/make-save-editor.js",
+    "wiki": "node tools/make-save-editor.js && node tools/wiki/build.js",
+    "wiki:sprites": "electron tools/wiki/export-sprites.js",
+    "wiki:serve": "node tools/wiki/serve.js",
+    "release": "node tools/release.js",
     "build": "electron-builder --win portable nsis"
   },
   "devDependencies": {
@@ -20,7 +24,7 @@
   },
   "build": {
     "appId": "com.idleit.ferme",
-    "productName": "IdleIt Ferme",
+    "productName": "Farmling",
     "files": [
       "src/**/*",
       "assets/**/*",
@@ -36,10 +40,10 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
-      "artifactName": "IdleIt-Ferme-Setup-${version}.${ext}"
+      "artifactName": "Farmling-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "IdleIt-Ferme-portable-${version}.exe"
+      "artifactName": "Farmling-portable-${version}.exe"
     },
     "publish": [
       {

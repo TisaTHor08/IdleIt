@@ -12,7 +12,9 @@ app.whenReady().then(async () => {
   // Rendu hors écran : rien ne s'affiche, mais la capture fonctionne.
   const win = new BrowserWindow({ width: 1200, height: 800, show: false, webPreferences: { contextIsolation: true, offscreen: true } });
   win.webContents.on('console-message', (_e, level, msg) => { if (level >= 3) errors.push(msg); });
-  await win.loadFile(path.join(__dirname, '..', 'editeur-de-save.html'));
+  // EDITOR_URL : tester l'éditeur intégré au wiki (ex. http://localhost:8080/editeur/) plutôt que le fichier autonome.
+  if (process.env.EDITOR_URL) await win.loadURL(process.env.EDITOR_URL);
+  else await win.loadFile(path.join(__dirname, '..', 'editeur-de-save.html'));
   const js = code => win.webContents.executeJavaScript(code);
   const fresh = new Game(null).serialize();
   await js(`window.confirm = () => true; loadText(${JSON.stringify(fresh)}, 'save.json')`);

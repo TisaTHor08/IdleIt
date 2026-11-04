@@ -1,0 +1,22 @@
+# Wiki de Farmling. Depuis la racine du dépôt :
+#   docker compose -f wiki/docker-compose.yml up -d --build
+# puis http://localhost:8080. Pour une URL publique (sitemap, liens canoniques) : SITE_URL=https://... dans .env ou l'environnement.
+services:
+  wiki:
+    build:
+      context: ..
+      dockerfile: wiki/Dockerfile
+      args:
+        SITE_URL: ${SITE_URL:-}
+    image: farmling-wiki:latest
+    container_name: farmling-wiki
+    ports:
+      - "${WIKI_PORT:-8080}:80"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true

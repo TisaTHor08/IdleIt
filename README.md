@@ -1,4 +1,4 @@
-# IdleIt Ferme
+# Farmling
 
 **Une ferme idle miniature qui vit au-dessus de ta barre des tâches.**
 Une bande de 40 px, transparente et toujours au premier plan : un fermier, des robots et des animaux cultivent tout seuls pendant que tu travailles. Pas de fond, tout est vu de profil, en pixel art dessiné en code. Les clics traversent les zones vides : la ferme ne gêne jamais.
@@ -21,8 +21,8 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 
 Télécharge l'un des deux fichiers de `dist/` (ou génère-les, voir [Développement](#développement)) :
 
-- **`IdleIt-Ferme-Setup-x.y.z.exe`** : installateur. Pour mettre à jour, lance simplement le nouvel installateur par-dessus l'ancien : **ta progression est conservée**.
-- **`IdleIt-Ferme-portable-x.y.z.exe`** : version portable, sans installation (même sauvegarde que la version installée).
+- **`Farmling-Setup-x.y.z.exe`** : installateur. Pour mettre à jour, lance simplement le nouvel installateur par-dessus l'ancien : **ta progression est conservée**.
+- **`Farmling-portable-x.y.z.exe`** : version portable, sans installation (même sauvegarde que la version installée).
 
 **Mises à jour automatiques** : la version installée vérifie les [releases GitHub](https://github.com/TisaTHor08/IdleIt/releases) au démarrage puis toutes les 4 h. Si une version plus récente existe, elle est téléchargée en arrière-plan, la partie est sauvegardée, puis la ferme s'installe et redémarre toute seule. La version portable affiche seulement une notification avec le lien de téléchargement.
 
@@ -201,6 +201,28 @@ Automatique, toutes les 5 s et à la fermeture, dans `%APPDATA%\IdleIt Ferme\sav
 
 ---
 
+## Site web et wiki
+
+Le dossier [`wiki/`](wiki/) contient un site complet, généré à partir des données du jeu : une page d'accueil de présentation, un wiki (chaque légume, chaque compagnon et ses voies, chaque gamelle et ses 36 effets, toutes les combinaisons, robots, améliorations, usine, marché, événements, renaissance, succès), une recherche, l'éditeur de sauvegarde et une page 404 aux couleurs du jeu.
+
+```
+npm run wiki            # génère wiki/dist (HTML statique)
+npm run wiki:serve      # aperçu sur http://localhost:8080
+npm run wiki:sprites    # réexporte les sprites du jeu en PNG (wiki/assets/img), après un changement de dessin
+```
+
+**Héberger avec Docker** (depuis la racine du dépôt) :
+
+```
+docker compose -f wiki/docker-compose.yml up -d --build
+```
+
+Le site est servi sur le port 8080 (`WIKI_PORT` pour en changer). `SITE_URL=https://ton-domaine` ajoute les liens canoniques et le `sitemap.xml`. L'image construit le site avec Node, puis le sert avec nginx : gzip, cache, en-têtes de sécurité, conteneur en lecture seule.
+
+Le site vise 100 partout sur PageSpeed : HTML statique avec le CSS en ligne, JavaScript seulement pour la recherche et l'éditeur (différé), images dimensionnées et chargées à la demande, sprites nets à la bonne résolution.
+
+---
+
 ## Développement
 
 Electron + JavaScript, sans framework ni dépendance d'exécution. Node.js 20 ou plus.
@@ -209,7 +231,7 @@ Electron + JavaScript, sans framework ni dépendance d'exécution. Node.js 20 ou
 npm install
 npm start                 # jouer
 npm run debug             # jouer en affichant les erreurs du jeu dans le terminal
-npm run build             # dist/IdleIt-Ferme-portable-x.y.z.exe et l'installateur
+npm run build             # dist/Farmling-portable-x.y.z.exe et l'installateur
 ```
 
 ### Tests et équilibrage

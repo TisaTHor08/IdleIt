@@ -965,6 +965,7 @@
     const c = document.createElement('canvas');
     c.width = 8 * scale; c.height = 8 * scale;
     const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false; // les sprites en cache sont agrandis : pas de flou
     x.scale(scale, scale);
     if (ic) drawMap(x, ic.map, ic.pal, 0, 8, false);
     const url = c.toDataURL();
@@ -977,6 +978,7 @@
     const c = document.createElement('canvas');
     c.width = 12 * scale; c.height = 12 * scale;
     const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false; // les sprites en cache sont agrandis : pas de flou
     x.scale(scale, scale);
     if (kind === 'drone') drawMap(x, DRONE_MAP, DRONE_PAL, 0, 9, false);
     else { const pal = ROBOT_PAL[kind] || ROBOT_PAL.rouille; drawMap(x, ROBOT_MAP, pal, 2, 11, false); drawMap(x, WHEELS[0], pal, 2, 12, false); }
@@ -991,6 +993,7 @@
     const c = document.createElement('canvas');
     c.width = 16 * scale; c.height = 16 * scale;
     const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false; // les sprites en cache sont agrandis : pas de flou
     x.scale(scale, scale);
     drawPet(x, id, look, { x: 8, dir: 1, anim: 0, moving: id === 'taupe' ? false : true, kind: 'pet' }, id === 'abeille' || look === 'rapace' || (PET_FLY[id] && PET_FLY[id](look)) ? 23 : 15, 0);
     const url = c.toDataURL();
@@ -1003,6 +1006,7 @@
     const c = document.createElement('canvas');
     c.width = 12 * scale; c.height = 18 * scale;
     const x = c.getContext('2d');
+    x.imageSmoothingEnabled = false; // les sprites en cache sont agrandis : pas de flou
     x.scale(scale, scale);
     drawPlant(x, seed, 6, 16, 1, false, 0);
     px(x, 1, 16, 10, 2, '#6b4426');

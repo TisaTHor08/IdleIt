@@ -1,0 +1,9 @@
+# Contexte Docker du wiki : seulement ce que le Dockerfile copie.
+*
+!package.json
+!src/renderer/js/data.js
+!tools/make-save-editor.js
+!tools/save-editor.src.html
+!tools/wiki/build.js
+!wiki/assets/**
+!wiki/nginx.conf

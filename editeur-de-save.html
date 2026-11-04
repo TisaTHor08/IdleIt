@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Éditeur de sauvegarde · IdleIt Ferme</title>
+<title>Éditeur de sauvegarde · Farmling</title>
 <style>
   :root { --bg: #1d1712; --panel: #2a2119; --line: #6b4f33; --text: #f4ead8; --muted: #b9a88f; --gold: #ffd84a; --ok: #7ee081; --bad: #ff7b6b; --btn: #5a3f26; --btn-hi: #7a5734; }
   * { box-sizing: border-box; }
@@ -15,7 +15,7 @@
   button { background: var(--btn); border: 1px solid var(--line); border-radius: 4px; padding: 4px 10px; cursor: pointer; }
   button:hover { background: var(--btn-hi); }
   button.gold { border-color: #c9962a; color: var(--gold); }
-  button.small { padding: 1px 6px; font-size: 11px; }
+  button.small { padding: 2px 8px; font-size: 12px; }
   input[type=number], input[type=text], select { background: #15100c; border: 1px solid var(--line); border-radius: 3px; padding: 2px 5px; }
   input[type=number] { width: 120px; }
   main { display: flex; min-height: calc(100vh - 52px); }
@@ -30,12 +30,12 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 4px 14px; }
   .f { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 3px 0; }
   .f label { flex: 1; }
-  .f .max { color: var(--muted); font-size: 11px; min-width: 52px; text-align: right; }
-  .muted { color: var(--muted); font-size: 11px; }
+  .f .max { color: var(--muted); font-size: 12px; min-width: 52px; text-align: right; }
+  .muted { color: var(--muted); font-size: 12px; }
   .bar { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
   .card { border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 10px; background: var(--panel); }
   .card .head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
-  .tag { font-size: 10px; padding: 0 5px; border-radius: 3px; background: #3a2c1e; color: var(--muted); }
+  .tag { font-size: 12px; padding: 0 5px; border-radius: 3px; background: #3a2c1e; color: var(--muted); }
   .chk { display: flex; align-items: center; gap: 5px; padding: 2px 0; }
   textarea { width: 100%; height: 60vh; background: #15100c; color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 12px Consolas, monospace; }
   .warn { color: var(--bad); }
@@ -45,7 +45,7 @@
 </head>
 <body>
 <header>
-  <h1>Éditeur de sauvegarde · IdleIt Ferme</h1><span class="muted">v0.12.0</span>
+  <h1>Éditeur de sauvegarde · Farmling</h1><span class="muted">v0.13.0</span>
   <span id="status" class="muted"></span>
   <span class="grow"></span>
   <label><input type="file" id="file" accept=".json,application/json" hidden><button id="open">Ouvrir…</button></label>
@@ -1496,7 +1496,7 @@ function ensure(s) {
 function loadText(txt, name) {
   let data;
   try { data = JSON.parse(txt); } catch (e) { alert('Ce fichier n’est pas une sauvegarde valide (JSON illisible).'); return; }
-  if (!data || typeof data !== 'object' || !('money' in data)) { alert('Ce fichier ne ressemble pas à une sauvegarde IdleIt Ferme.'); return; }
+  if (!data || typeof data !== 'object' || !('money' in data)) { alert('Ce fichier ne ressemble pas à une sauvegarde Farmling.'); return; }
   save = ensure(data); fileName = name || 'save.json';
   const drop = $('drop'); if (drop) drop.remove();
   $('nav').hidden = false; $('dl').hidden = false; $('god').hidden = false;
