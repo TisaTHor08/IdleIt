@@ -118,6 +118,13 @@
       // Effet d'une gamelle sur ce compagnon : celui de sa voie, sinon de son espèce, sinon l'effet général.
       foodEffectFor(pet, foodId) { return FOOD_BY_ID[foodId] ? D.foodEffect(pet.id, pet.path, foodId) : null; },
       foodEffect(pet) { return pet && pet.food ? this.foodEffectFor(pet, pet.food) : null; },
+      // Costume : la saison de sa gamelle de saison, si elle a un effet spécial pour lui (sinon null).
+      petSkin(pet) {
+        const f = pet && pet.food && FOOD_BY_ID[pet.food];
+        if (!f || !f.season) return null;
+        const e = this.foodEffectFor(pet, pet.food);
+        return e && e.special ? f.season : null;
+      },
       // Donne une gamelle du placard (celle qu'il avait déjà y retourne), ou la retire (foodId = null).
       equipFood(pet, foodId) {
         if (!pet) return false;
@@ -170,7 +177,7 @@
         for (const pet of this.s.pets.list) {
           const r = this.petRt && this.petRt[pet.uid];
           if (!r || !r.pm.petWorker) continue;
-          for (let k = 0; k < r.pm.petWorkerCount; k++) out.push({ kind: `pet:${pet.uid}:${k}`, def: { ...r.pm.petWorker, pack: k > 0, petId: pet.id, petUid: pet.uid, look: r.look } });
+          for (let k = 0; k < r.pm.petWorkerCount; k++) out.push({ kind: `pet:${pet.uid}:${k}`, def: { ...r.pm.petWorker, pack: k > 0, petId: pet.id, petUid: pet.uid, look: r.look, skin: this.petSkin(pet) } });
         }
         return out;
       },
@@ -324,10 +331,12 @@
           if (!r) continue;
           this.updatePathEffects(r, dt);
           const move = r.pm.move;
+          // Costume de saison : sa propre allure (traîneau qui file, fantôme qui flâne...).
+          const skinSpeed = { noel: 1.8, halloween: 0.7, fete_musique: 1.2, paques: 1.3, nouvel_an_chinois: 1.4 }[this.petSkin(pet)] || 1;
           r.ents.forEach((e, k) => {
             e.anim += dt;
             if (e.perched) return;
-            let speed = move === 'dig' ? 5 : move === 'fly' ? 14 : 9;
+            let speed = (move === 'dig' ? 5 : move === 'fly' ? 14 : 9) * skinSpeed;
             if (move === 'farmer' && k === 0 && farmer) {
               const want = farmer.x - farmer.dir * 7;
               if (Math.abs(want - e.x) > 4) { e.tx = want; speed = Math.max(10, this.walkSpeed(farmer) * 1.2); }

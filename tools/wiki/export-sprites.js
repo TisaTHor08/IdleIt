@@ -25,6 +25,8 @@ app.whenReady().then(async () => {
     for (const sd of D.SEASON_SEEDS) out['seed-' + sd.id] = S.seedIconURL(sd, SC);
     for (const p of D.PETS) for (const look of ['base', 'evo', ...p.paths.map(x => x.id)]) out['pet-' + p.id + '-' + look] = S.petIconURL(p.id, look, SC);
     for (const r of D.ROBOTS) out['robot-' + r.id] = S.robotIconURL(r.id, SC);
+    // Costumes des gamelles de saison (compagnons qui ont leur effet spécial)
+    for (const f of D.PET_FOODS.filter(x => x.season)) for (const x of f.special) out['pet-' + x.pet + '-skin-' + f.season] = S.petIconURL(x.pet, 'base', SC, f.season);
     for (const k of Object.keys(S.ICONS)) out['icon-' + k] = S.iconURL(k, SC);
     for (const m of D.MACHINES) out['machine-' + m.id] = canvas(16, 16, x => S.drawMachine(x, m.id, 8, 16, true, 0.4, 0.6, '#7ee081'));
     out['barn'] = canvas(26, 20, x => S.drawBarn(x, 0, 20));

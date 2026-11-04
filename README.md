@@ -179,7 +179,7 @@ Sept fêtes changent la ferme pendant 3 semaines (10 jours avant et après la da
 | Halloween (31 octobre) | Potiron hanté, herbe de sorcière | Bonbon au potiron : chasse chaque corbeau (×3), mais nuits plus longues |
 | Noël (25 décembre) | Sapin, houx | Pain d'épices : marchand ×4 toutes les 4 min, mais plantes -10 % |
 
-Chaque gamelle de saison a aussi des **effets spéciaux** propres à 3 ou 4 compagnons (chat de sorcière, renne du Père Noël, coq du zodiaque, hibou DJ…), chacun avec sa contrepartie.
+Chaque gamelle de saison a aussi des **effets spéciaux** propres à 3 ou 4 compagnons (chat de sorcière, renne du Père Noël, coq du zodiaque, hibou DJ…), chacun avec sa contrepartie. Ces compagnons portent alors le **costume de la fête** toute l'année tant qu'ils gardent la gamelle : couleurs, accessoire, particules (feux follets, flocons, cœurs, notes…) et façon de bouger (le lapin sautille, le fantôme flotte, le danseur danse, le traîneau file).
 
 ### Renaissance
 

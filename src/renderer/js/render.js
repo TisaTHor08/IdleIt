@@ -269,7 +269,8 @@
           for (const e of r.ents) S.px(ctx, e.x - aura.radius, H - 15, aura.radius * 2, 15, '#ff9a3c');
           ctx.globalAlpha = 1;
         }
-        for (const e of r.ents) S.drawPet(ctx, pet.id, e.kind === 'chick' ? 'base' : r.look, e, GROUND, t);
+        const skin = g.petSkin(pet);
+        for (const e of r.ents) S.drawPet(ctx, pet.id, e.kind === 'chick' ? 'base' : r.look, e, GROUND, t, skin);
         if (this.hover && this.hover.type === 'pet' && this.hover.uid === pet.uid && aura) {
           ctx.globalAlpha = 0.18;
           for (const e of r.ents) S.px(ctx, e.x - aura.radius, H - 15, aura.radius * 2, 15, '#ffe066');

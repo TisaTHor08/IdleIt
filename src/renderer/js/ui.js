@@ -593,7 +593,7 @@
         const special = eff.special;
         items.push({
           key: 'pf-' + pet.uid + f.id, icon: S.iconURL('food', 3), title: f.name + (on ? ' (équipée)' : ''), level: owned ? `${owned} au placard` : '',
-          desc: (f.lost ? '<b style="color:var(--gold)">Gamelle de saison.</b> ' : special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc + (eff.relief ? ` <span style="color:var(--ok)">Plus de contrepartie : ${eff.relief}.</span>` : '') + (eff.malus ? ` <span style="color:var(--bad)">Contrepartie : ${eff.malus}.</span>` : ''),
+          desc: (f.lost ? `<b style="color:var(--gold)">Gamelle de saison${special ? ' · costume de ' + D.SEASONS.find(x => x.id === f.season).name : ''}.</b> ` : special ? '<b style="color:var(--gold)">Effet spécial !</b> ' : '') + eff.desc + (eff.relief ? ` <span style="color:var(--ok)">Plus de contrepartie : ${eff.relief}.</span>` : '') + (eff.malus ? ` <span style="color:var(--bad)">Contrepartie : ${eff.malus}.</span>` : ''),
           buttons: [on ? (f.lost
             ? { id: 'e', label: this.foodArmed === pet.uid ? 'Confirmer (détruite)' : 'Retirer et perdre', cls: this.foodArmed === pet.uid ? 'gold' : '', enabled: true, onClick: () => { if (this.foodArmed === pet.uid) { this.foodArmed = null; g.equipFood(pet, null); } else this.foodArmed = pet.uid; } }
             : { id: 'e', label: 'Retirer', enabled: true, onClick: () => g.equipFood(pet, null) })

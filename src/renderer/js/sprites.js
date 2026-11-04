@@ -319,16 +319,106 @@
     }
   }
 
+  // Costumes des gamelles de saison : un compagnon qui a l'effet spécial d'une gamelle de saison porte le costume
+  // de cette fête, toute l'année, tant qu'il la porte : palette (par espèce : toutes ses apparences partagent les
+  // mêmes lettres), accessoire, particules et façon de bouger. body = couleurs des abeilles (dessinées pixel par pixel).
+  const PET_SKINS = {
+    halloween: {
+      chat: { k: '#121216', e: '#ff7a1e' }, hibou: { b: '#4a2a5a', c: '#8a6aaa', y: '#ff7a1e', e: '#1a1a1a', o: '#e8a33a' },
+      chien: { b: '#5a5a66', d: '#2b2b33', e: '#ffd84a', n: '#1a1a1a' },
+    },
+    noel: {
+      chien: { b: '#8a5a33', d: '#5a3a22', e: '#1a1a1a', n: '#e0302a' }, renard: { o: '#f4f6fa', w: '#dfe6ee', e: '#1a1a1a', n: '#1a1a1a', d: '#9fb8d8' },
+      licorne: { w: '#e6f4ff', m: '#9fd8ff', g: '#ffffff', e: '#2a4a8a' }, abeille: { body: ['#e0302a', '#f4f1ea'] },
+    },
+    nouvel_an: {
+      poussin: { y: '#ffd84a', o: '#c77dff', e: '#2b1d14', r: '#c77dff', w: '#fff1a8', g: '#ffd84a', b: '#c77dff' },
+      renard: { o: '#2a2350', w: '#ffd84a', e: '#ffd84a', n: '#ffd84a', d: '#c77dff' }, dragon: { g: '#2a2350', w: '#c77dff', y: '#ffd84a', e: '#ffd84a' },
+    },
+    nouvel_an_chinois: {
+      dragon: { g: '#d9a52a', w: '#ff5e3a', y: '#fff3c4', e: '#e0302a' }, chat: { k: '#ffd84a', e: '#e0302a' },
+      poussin: { y: '#e0302a', o: '#ffd84a', e: '#2b1d14', r: '#ffd84a', w: '#e0302a', g: '#ffd84a', b: '#e0302a' },
+    },
+    saint_valentin: {
+      chat: { k: '#e8a0b8', e: '#e0305a' }, chien: { b: '#ff8fb0', d: '#e0305a', e: '#1a1a1a', n: '#e0305a' },
+      licorne: { w: '#ffe0ec', m: '#ff4f7a', g: '#ffd84a', e: '#a0305a' },
+    },
+    paques: {
+      poussin: { y: '#ffc4e0', e: '#2b1d14', o: '#ff8fd0', r: '#9fd8ff', w: '#fff3f8', g: '#9fe0a0', b: '#ffc4e0' },
+      renard: { o: '#f4f1ea', w: '#ffc4e0', e: '#1a1a1a', n: '#ff8fd0', d: '#c9a46b' }, abeille: { body: ['#ffc4e0', '#9fd8ff'] },
+    },
+    fete_musique: {
+      hibou: { b: '#5a3a9a', c: '#c9b8e8', y: '#7ee081', e: '#1a1a1a', o: '#ffd84a' }, chien: { b: '#2b2b33', d: '#9a7bff', e: '#7ee081', n: '#1a1a1a' },
+      abeille: { body: ['#9a7bff', '#7ee081'] },
+    },
+  };
+  let SKIN = null, SKIN_SEASON = null; // costume du compagnon en cours de dessin
+  const skinPals = new Map();          // palettes fusionnées (stables : le cache des sprites reste efficace)
+  function skinPal(key, base) {
+    const k = SKIN_SEASON + '|' + key;
+    let p = skinPals.get(k);
+    if (!p) { p = { ...base }; for (const c of Object.keys(base)) if (SKIN[c]) p[c] = SKIN[c]; skinPals.set(k, p); }
+    return p;
+  }
+  // Façon de bouger de chaque costume (décalage du dessin, sans toucher à la simulation).
+  function skinMotion(skin, e, t) {
+    const a = e.anim || 0, mv = e.moving;
+    switch (skin) {
+      case 'paques': return { dx: 0, dy: mv ? -Math.round(Math.abs(Math.sin(a * 7)) * 3) : -Math.round(Math.abs(Math.sin(a * 2))) };      // lapin qui sautille
+      case 'halloween': return { dx: 0, dy: -2 + Math.round(Math.sin(a * 1.6) * 2), alpha: 0.65 + 0.35 * Math.abs(Math.sin(a * 0.9)) }; // fantôme qui flotte
+      case 'fete_musique': return { dx: Math.round(Math.sin(t * 8)), dy: -(Math.floor(t * 4) % 2) };                                   // danse en rythme
+      case 'saint_valentin': return { dx: 0, dy: -1 - Math.round((Math.sin(a * 3) + 1) * 0.8) };                                       // il plane d'amour
+      case 'nouvel_an': return { dx: 0, dy: Math.floor(a / 3) % 3 === 0 ? -Math.round(Math.sin((a % 3) * Math.PI / 3) * 4) : 0 };    // sauts de joie
+      case 'nouvel_an_chinois': return { dx: Math.round(Math.sin(a * 2.4) * 1.5), dy: Math.round(Math.cos(a * 4.8)) };                 // ondule comme le dragon de papier
+      default: return null;                                                                                                             // Noël : il glisse (vitesse, pets.js)
+    }
+  }
+  // Particules autour du compagnon costumé.
+  function drawSkinParticles(ctx, skin, x, ground, t) {
+    for (let k = 0; k < 3; k++) {
+      const p = ((t + k * 0.8) % 2.4) / 2.4, ox = Math.round(x - 5 + ((k * 37) % 11) + Math.sin(t * 2 + k) * 2);
+      ctx.globalAlpha = 1 - p * 0.9;
+      if (skin === 'halloween') px(ctx, ox, ground - 6 - p * 10, 1, 1, k % 2 ? '#9a4bff' : '#c9a0ff');
+      else if (skin === 'noel') px(ctx, ox, ground - 16 + p * 14, 1, 1, '#ffffff');
+      else if (skin === 'nouvel_an') { ctx.globalAlpha = 1; if (Math.floor(t * 6 + k) % 3 === 0) px(ctx, ox, ground - 8 - ((k * 5) % 7), 1, 1, ['#ffd84a', '#c77dff', '#ff7b6b'][k]); }
+      else if (skin === 'nouvel_an_chinois') { px(ctx, ox, ground - 4 - p * 9, 1, 1, '#ffd84a'); if (k === 0) px(ctx, ox + 1, ground - 5 - p * 9, 1, 1, '#e0302a'); }
+      else if (skin === 'saint_valentin') { const hy = Math.round(ground - 8 - p * 9); px(ctx, ox, hy, 1, 1, '#ff4f7a'); px(ctx, ox + 2, hy, 1, 1, '#ff4f7a'); px(ctx, ox, hy + 1, 3, 1, '#ff4f7a'); px(ctx, ox + 1, hy + 2, 1, 1, '#ff4f7a'); }
+      else if (skin === 'paques') px(ctx, ox, ground - 3 - p * 6, 1, 1, ['#ffc4e0', '#9fd8ff', '#fff3a8'][k]);
+      else if (skin === 'fete_musique') { const ny = Math.round(ground - 8 - p * 10), c = ['#9a7bff', '#7ee081', '#ffd84a'][k]; px(ctx, ox, ny, 2, 1, c); px(ctx, ox + 1, ny - 3, 1, 3, c); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Accessoire du costume, au-dessus de la tête du compagnon.
+  function drawSkinMark(ctx, skin, x, ground, id, look, t) {
+    const fly = id === 'abeille' || id === 'hibou' || look === 'rapace' || ((id === 'licorne' || id === 'dragon') && look !== 'base');
+    const y = Math.round(ground - (id === 'taupe' ? 7 : fly ? 20 : 12)), cx = Math.round(x);
+    if (skin === 'halloween') { px(ctx, cx - 1, y, 3, 1, '#3a1e5a'); px(ctx, cx, y - 2, 1, 2, '#3a1e5a'); px(ctx, cx - 1, y + 1, 3, 1, '#ff7a1e'); }
+    else if (skin === 'noel') { px(ctx, cx - 1, y, 3, 1, '#e0302a'); px(ctx, cx, y - 1, 1, 1, '#e0302a'); px(ctx, cx + 1, y - 2, 1, 1, '#ffffff'); }
+    else if (skin === 'nouvel_an') { px(ctx, cx, y - 2, 1, 3, '#c77dff'); px(ctx, cx, y - 3, 1, 1, '#ffd84a'); }
+    else if (skin === 'nouvel_an_chinois') { px(ctx, cx - 1, y - 1, 3, 2, '#e0302a'); px(ctx, cx - 1, y - 1, 3, 1, '#ffd84a'); }
+    else if (skin === 'saint_valentin') { px(ctx, cx - 1, y - 1, 1, 1, '#ff4f7a'); px(ctx, cx + 1, y - 1, 1, 1, '#ff4f7a'); px(ctx, cx - 1, y, 3, 1, '#ff4f7a'); px(ctx, cx, y + 1, 1, 1, '#ff4f7a'); }
+    else if (skin === 'paques') { px(ctx, cx - 1, y - 3, 1, 3, '#f4f1ea'); px(ctx, cx + 1, y - 3, 1, 3, '#f4f1ea'); px(ctx, cx - 1, y - 2, 1, 1, '#ffc4e0'); px(ctx, cx + 1, y - 2, 1, 1, '#ffc4e0'); }
+    else if (skin === 'fete_musique') { const b = Math.floor((t || 0) * 3) % 2; px(ctx, cx, y - 2 - b, 2, 1, '#9a7bff'); px(ctx, cx + 1, y - 5 - b, 1, 3, '#9a7bff'); }
+  }
+
   function drawPetMap(ctx, key, x, bottom, flip, frame) {
     const sp = PET_SPRITES[key];
     const map = sp.maps[frame % sp.maps.length];
-    const over = SEASON && PET_SEASON_PAL[SEASON] && PET_SEASON_PAL[SEASON][key];
+    const over = SKIN ? skinPal(key, sp.pal) : SEASON && PET_SEASON_PAL[SEASON] && PET_SEASON_PAL[SEASON][key];
     drawMap(ctx, map, over || sp.pal, x - (map[0].length >> 1), bottom, flip);
   }
 
   // e = { x, dir, anim, moving, kind }, id = compagnon, evo = évolué ?
   // look = 'base' | 'evo' | id de la voie (voir petLook() dans core.js).
-  function drawPet(ctx, id, look, e, ground, t) {
+  function drawPet(ctx, id, look, e, ground, t, skin) {
+    SKIN_SEASON = skin || null;
+    SKIN = (skin && PET_SKINS[skin] && PET_SKINS[skin][id]) || null;
+    const m = skin ? skinMotion(skin, e, t) : null;
+    if (m) { ctx.save(); ctx.translate(m.dx, m.dy); if (m.alpha != null) ctx.globalAlpha = m.alpha; }
+    try { drawPetBody(ctx, id, look, e, ground, t); } finally { SKIN = null; SKIN_SEASON = null; if (m) ctx.restore(); }
+    if (skin) { drawSkinMark(ctx, skin, e.x + (m ? m.dx : 0), ground + (m ? m.dy : 0), id, look, t); drawSkinParticles(ctx, skin, e.x, ground, t); }
+  }
+  function drawPetBody(ctx, id, look, e, ground, t) {
     const evo = look !== 'base';
     const flip = e.dir < 0;
     const frame = e.moving ? Math.floor(e.anim * 8) % 2 : 0;
@@ -350,7 +440,7 @@
       const key = look === 'base' ? 'chien' : look === 'evo' ? 'berger' : look;
       drawPetMap(ctx, key, x, ground - 2, flip, frame);
       if (look === 'saintbernard') px(ctx, x + (flip ? -2 : 1), ground - 5, 2, 2, '#8a5a33');
-      if (SEASON === 'noel') { const hx = x + (flip ? -3 : 2); px(ctx, hx, ground - 9, 1, 2, '#8a5a33'); px(ctx, hx + (flip ? -1 : 1), ground - 10, 1, 2, '#8a5a33'); px(ctx, hx - (flip ? -1 : 1), ground - 10, 1, 1, '#8a5a33'); }
+      if (SEASON === 'noel' || SKIN_SEASON === 'noel') { const hx = x + (flip ? -3 : 2); px(ctx, hx, ground - 9, 1, 2, '#8a5a33'); px(ctx, hx + (flip ? -1 : 1), ground - 10, 1, 2, '#8a5a33'); px(ctx, hx - (flip ? -1 : 1), ground - 10, 1, 1, '#8a5a33'); }
     } else if (id === 'chat') {
       const sleeping = look !== 'cheshire' && !e.moving && Math.sin(e.anim * 0.3) > 0.6;
       const key = look === 'base' ? 'chat' : look === 'evo' ? 'maneki' : look;
@@ -387,7 +477,7 @@
     } else if (id === 'abeille') {
       const bees = look === 'nuee' ? 16 : evo ? 5 : 1;
       const spread = look === 'nuee' ? 4 : 2;
-      const body = look === 'guerriere' ? ['#e0302a', '#121216'] : look === 'doree' ? ['#ffd84a', '#c9962a'] : ['#f2b84b', '#2b1d14'];
+      const body = SKIN && SKIN.body ? SKIN.body : look === 'guerriere' ? ['#e0302a', '#121216'] : look === 'doree' ? ['#ffd84a', '#c9962a'] : ['#f2b84b', '#2b1d14'];
       for (let k = 0; k < bees; k++) {
         const a = e.anim * (3 + (k % 5)) + k * 1.7;
         const bx = x + (k ? Math.cos(a) * (4 + k * spread) : 0);
@@ -410,7 +500,12 @@
   // Ouvriers-compagnons (chien de berger et sa meute).
   function drawPetWorker(ctx, w, x, ground, look, flip, frame, bob) {
     const key = look === 'cerbere' || look === 'loup' ? look : 'berger';
+    const skin = w.def.skin;
+    SKIN_SEASON = skin || null;
+    SKIN = (skin && PET_SKINS[skin] && PET_SKINS[skin][w.def.petId]) || null;
     drawPetMap(ctx, key, x, ground - 2 + bob, flip, frame);
+    SKIN = null; SKIN_SEASON = null;
+    if (skin) { drawSkinMark(ctx, skin, x, ground, w.def.petId, look, w.anim || 0); drawSkinParticles(ctx, skin, x, ground, w.anim || 0); }
     if (look === 'cerbere') {
       const hx = x + (flip ? -4 : 2);
       px(ctx, hx, ground - 8, 2, 2, '#3a1414'); px(ctx, hx + (flip ? -1 : 2), ground - 7, 1, 1, '#ff3b3b');
@@ -1112,16 +1207,16 @@
     iconCache.set(key, url);
     return url;
   }
-  function petIconURL(id, look, scale = 3) {
+  function petIconURL(id, look, scale = 3, skin = null) {
     if (look === true) look = 'evo'; else if (!look) look = 'base';
-    const key = 'pet:' + id + ':' + look + '@' + scale;
+    const key = 'pet:' + id + ':' + look + '@' + scale + (skin ? '#' + skin : '');
     if (iconCache.has(key)) return iconCache.get(key);
     const c = document.createElement('canvas');
     c.width = 16 * scale; c.height = 16 * scale;
     const x = c.getContext('2d');
     x.imageSmoothingEnabled = false; // les sprites en cache sont agrandis : pas de flou
     x.scale(scale, scale);
-    drawPet(x, id, look, { x: 8, dir: 1, anim: 0, moving: id === 'taupe' ? false : true, kind: 'pet' }, id === 'abeille' || look === 'rapace' || (PET_FLY[id] && PET_FLY[id](look)) ? 23 : 15, 0);
+    drawPet(x, id, look, { x: 8, dir: 1, anim: 0, moving: id === 'taupe' ? false : true, kind: 'pet' }, id === 'abeille' || look === 'rapace' || (PET_FLY[id] && PET_FLY[id](look)) ? 23 : 15, 0, skin);
     const url = c.toDataURL();
     iconCache.set(key, url);
     return url;
