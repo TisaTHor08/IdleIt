@@ -1,6 +1,6 @@
 # Wiki de Farmling : généré à partir des données du jeu, servi par nginx.
 # Image figée (sans mise à jour automatique), depuis la racine du dépôt :
-#   docker build -f wiki/Dockerfile -t farmling-wiki . && docker run -d -p 8080:80 farmling-wiki
+#   docker build -f wiki/Dockerfile -t farmling-wiki . && docker run -d -p 47320:80 farmling-wiki
 # Pour un site qui se met à jour tout seul, utiliser wiki/docker-compose.yml.
 
 # Étape 1 : génération du site statique (aucune dépendance npm nécessaire)

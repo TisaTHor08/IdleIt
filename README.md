@@ -218,10 +218,10 @@ git clone https://github.com/TisaTHor08/IdleIt.git && cd IdleIt
 docker compose -f wiki/docker-compose.yml up -d --build
 ```
 
-Le site est servi sur le port 8080. Deux conteneurs : `site` (nginx) et `updater`, qui vérifie le dépôt GitHub toutes les 2 minutes. Dès que le dossier `wiki/` change (ou les données du jeu, le générateur, l'éditeur de sauvegarde, la version), il régénère le site et le met en ligne d'un coup : nginx ne sert jamais un site à moitié construit, et si une construction échoue, la version en ligne reste en place. Il suffit donc de pousser sur `main` : le NAS suit tout seul, sans ouvrir de port ni configurer de clé.
+Le site est servi sur le port **47320** (`http://<nas>:47320`). Deux conteneurs : `site` (nginx) et `updater`, qui vérifie le dépôt GitHub toutes les 2 minutes. Dès que le dossier `wiki/` change (ou les données du jeu, le générateur, l'éditeur de sauvegarde, la version), il régénère le site et le met en ligne d'un coup : nginx ne sert jamais un site à moitié construit, et si une construction échoue, la version en ligne reste en place. Il suffit donc de pousser sur `main` : le NAS suit tout seul, sans ouvrir de port ni configurer de clé.
 
 Réglages (fichier `.env` à côté du compose, ou variables d'environnement) :
-- `WIKI_PORT` (8080 par défaut) ;
+- `WIKI_PORT` (47320 par défaut) ;
 - `SITE_URL` : liens canoniques et `sitemap.xml` ;
 - `BRANCH` (`main`) ;
 - `INTERVAL` (120 s) ;
@@ -229,7 +229,7 @@ Réglages (fichier `.env` à côté du compose, ou variables d'environnement) :
 
 Pour voir ce que fait l'updater : `docker logs -f farmling-site-updater`.
 
-**Image figée** (sans mise à jour) : `docker build -f wiki/Dockerfile -t farmling-wiki .` puis `docker run -d -p 8080:80 farmling-wiki`. L'image construit le site avec Node, puis le sert avec nginx. Les deux modes ont gzip, le cache, les en-têtes de sécurité et un conteneur nginx en lecture seule.
+**Image figée** (sans mise à jour) : `docker build -f wiki/Dockerfile -t farmling-wiki .` puis `docker run -d -p 47320:80 farmling-wiki`. L'image construit le site avec Node, puis le sert avec nginx. Les deux modes ont gzip, le cache, les en-têtes de sécurité et un conteneur nginx en lecture seule.
 
 Le site vise 100 partout sur PageSpeed : HTML statique avec le CSS en ligne, JavaScript seulement pour la recherche et l'éditeur (différé), images dimensionnées et chargées à la demande, sprites nets à la bonne résolution.
 
