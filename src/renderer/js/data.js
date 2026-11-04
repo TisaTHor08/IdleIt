@@ -6,10 +6,16 @@
   // ---------- Renaissances ----------
   // Seuil de la renaissance n° p (p = renaissances déjà faites) : base × growth^p.
   // Graines d'or gagnées : gsBase × (gagné / seuil)^gsExp (au moins 1 au seuil). Chaque graine d'or gagnée : +bonus de revenus.
-  const PRESTIGE = { base: 1e9, growth: 25, gsBase: 3, gsExp: 0.35, bonus: 0.01, petSlots: 1, maxPetSlots: 6 };
-  // Seuil de la renaissance n° p+1 : chaque partie demande growth × accel^p fois plus que la précédente,
-  // pour que les parties s'allongent peu à peu (≈ 1 h de plus par facteur e, voir tools/sim-life.js).
-  const threshold = p => PRESTIGE.base * Math.pow(PRESTIGE.growth, p) * Math.pow(PRESTIGE.accel || 1, p * (p - 1) / 2);
+  // Seuils des renaissances (gagné dans la partie), calibrés avec tools/sim-life.js (CALIB=1) pour que la partie n° p+1 dure
+  // environ 5.5 h + 0.27 h × p avec un joueur efficace (≈ 160 h pour 20 renaissances), puis lissés. Au-delà du tableau : ×1000 par renaissance.
+  const PRESTIGE = {
+    thresholds: [3e8, 2.4e13, 2.3e14, 2.2e15, 2.1e16, 2e17, 1.9e18, 1.9e19, 1.8e20, 1.7e21, 1.7e22, 1.6e23, 1.5e24, 1.5e25, 1.4e26, 1.3e27, 1.3e28, 1.2e29, 1.2e30, 1.1e31],
+    gsBase: 5, gsExp: 0.25, bonus: 0.01, petSlots: 1, maxPetSlots: 6,
+  };
+  const threshold = p => {
+    const T = PRESTIGE.thresholds, last = T.length - 1;
+    return p <= last ? T[p] : T[last] * Math.pow(1000, p - last);
+  };
 
   // ---------- Légumes ----------
   // Familles : bonus ciblés, durée de conservation au silo (secondes avant de perdre ~63% de fraîcheur).
@@ -25,9 +31,9 @@
     exotique: { name: 'Exotiques', shelf: 700 },
     mythique: { name: 'Mythiques', shelf: 1200 },
   };
-  // Courbe économique : valeur ×valueR, pousse ×growR par rang ; déblocage ×unlockR (ère 1),
-  // puis pour les ères suivantes une fraction du seuil de la renaissance qui les débloque.
-  const ECO = { valueR: 2.9, growBase: 5, growR: 1.105, growMax: 600, unlockBase: 30, unlockR: 20, eraUnlock: [0.04, 0.3, 2.5] };
+  // Courbe économique : valeur ×valueR, pousse ×growR par rang. Prix : ×unlockR par légume dans l'ère 1 ;
+  // ensuite, le k-ième légume d'une ère coûte eraMult[k] × le seuil de la renaissance précédente.
+  const ECO = { valueR: 2.9, growBase: 5, growR: 1.105, growMax: 600, unlockBase: 30, unlockR: 20, eraMult: [0.3, 1, 3] };
 
   // [id, nom, famille, forme, feuillage, fruit, renaissances requises, options]
   const SEED_LIST = [
@@ -39,53 +45,53 @@
     ['patate', 'Pomme de terre', 'racine', 'tuber', '#5c9a3a', '#c9a06b', 0, { desc: 'Pousse sous terre.' }],
     ['tomate', 'Tomate', 'fruit', 'vine', '#3f9a3a', '#e8372e', 0, { thirst: 1.2, desc: 'Grimpe le long de son tuteur.' }],
     ['haricot', 'Haricot vert', 'legumineuse', 'pod', '#4f9a3a', '#7cc25a', 0, { desc: 'Des gousses à profusion.' }],
-    ['chou', 'Chou', 'feuille', 'leafy', '#4f8f68', '#a6d8b0', 0, { desc: 'Robuste et rentable.' }],
-    ['oignon', 'Oignon', 'racine', 'bulb', '#6fae3c', '#e8d0a0', 0, { desc: 'Fait pleurer les corbeaux.' }],
-    ['mais', 'Maïs', 'cereale', 'stalk', '#69a83a', '#f5d142', 0, { desc: 'Monte très haut.' }],
-    ['aubergine', 'Aubergine', 'fruit', 'vine', '#3d8a45', '#6b2d8c', 0, { thirst: 1.2, desc: 'Violette et précieuse.' }],
-    ['citrouille', 'Citrouille', 'fruit', 'ground', '#4b9a3a', '#f07f13', 0, { desc: 'Énorme à maturité.' }],
+    ['chou', 'Chou', 'feuille', 'leafy', '#4f8f68', '#a6d8b0', 1, { desc: 'Robuste et rentable.' }],
+    ['oignon', 'Oignon', 'racine', 'bulb', '#6fae3c', '#e8d0a0', 2, { desc: 'Fait pleurer les corbeaux.' }],
+    ['mais', 'Maïs', 'cereale', 'stalk', '#69a83a', '#f5d142', 2, { desc: 'Monte très haut.' }],
+    ['aubergine', 'Aubergine', 'fruit', 'vine', '#3d8a45', '#6b2d8c', 3, { thirst: 1.2, desc: 'Violette et précieuse.' }],
+    ['citrouille', 'Citrouille', 'fruit', 'ground', '#4b9a3a', '#f07f13', 4, { desc: 'Énorme à maturité.' }],
     // Ère 2 et suivantes : se débloquent avec les renaissances
-    ['fraise', 'Fraise', 'baie', 'bush', '#3f9a3a', '#e8372e', 1, { desc: 'Délicieuse, mais périt très vite.' }],
-    ['poivron', 'Poivron', 'fruit', 'vine', '#3f8f34', '#f2b84b', 1, { desc: 'Jaune, rouge ou vert selon l\'humeur.' }],
-    ['pasteque', 'Pastèque', 'fruit', 'ground', '#3f8f34', '#2f8f3a', 1, { fruit2: '#8fd16a', thirst: 1.7, desc: 'Très assoiffée.' }],
-    ['brocoli', 'Brocoli', 'feuille', 'leafy', '#3f7f4a', '#4f9a5a', 2, { desc: 'Un petit arbre comestible.' }],
-    ['tournesol', 'Tournesol', 'fleur', 'flower', '#4f9a3a', '#ffd84a', 2, { center: '#6b4426', desc: 'Suit le soleil : pousse mieux par beau temps.' }],
-    ['riz', 'Riz', 'cereale', 'grain', '#7cc25a', '#f2efe6', 2, { thirst: 2.2, desc: 'Les pieds dans l\'eau.' }],
-    ['champignon', 'Champignon', 'champi', 'mushroom', '#e8dcc8', '#c0392b', 3, { night: true, desc: 'Pousse surtout la nuit.' }],
-    ['asperge', 'Asperge dorée', 'feuille', 'spear', '#8bb84a', '#f2c84b', 3, { desc: 'Un mets de roi.' }],
-    ['ail', 'Ail', 'racine', 'bulb', '#7cc25a', '#f2efe6', 3, { desc: 'Éloigne les vampires et les pucerons.' }],
-    ['framboise', 'Framboise', 'baie', 'bush', '#3f8f34', '#c2185b', 4, { desc: 'Fragile comme tout.' }],
-    ['artichaut', 'Artichaut', 'fleur', 'flower', '#5a8f6a', '#8fae8f', 4, { center: '#7d3fc4', desc: 'Une fleur qu\'on mange avant qu\'elle n\'éclose.' }],
-    ['poireau', 'Poireau', 'feuille', 'stalk', '#4f8f3a', '#e8f2d0', 4, { desc: 'Long et droit.' }],
-    ['melon', 'Melon', 'fruit', 'ground', '#4b9a3a', '#d9c27a', 5, { fruit2: '#b8a35a', desc: 'Parfumé.' }],
-    ['cafe', 'Café', 'exotique', 'tree', '#2f6a3a', '#c0392b', 5, { desc: 'Réveille même le fermier.' }],
-    ['lentille', 'Lentille', 'legumineuse', 'pod', '#6f9a3a', '#a0703a', 5, { desc: 'Petite mais se garde longtemps.' }],
-    ['vanille', 'Vanille', 'exotique', 'vine', '#3f8f34', '#f2e0a0', 6, { desc: 'Une orchidée grimpante.' }],
-    ['cacao', 'Cacao', 'exotique', 'tree', '#2f6a3a', '#a0602f', 6, { desc: 'Le chocolat commence ici.' }],
-    ['safran', 'Safran', 'fleur', 'flower', '#4f9a3a', '#9a4bff', 6, { center: '#ff7a1e', desc: 'L\'or rouge.' }],
-    ['truffe', 'Truffe noire', 'champi', 'mushroom', '#5a4a3a', '#2b1d14', 7, { night: true, desc: 'Le diamant noir, pousse la nuit.' }],
-    ['mandragore', 'Mandragore', 'mythique', 'mandrake', '#5b7f3a', '#d9b48a', 7, { thirst: 0.8, night: true, desc: 'Pousse surtout la nuit.' }],
-    ['ginseng', 'Ginseng', 'racine', 'root', '#4f8f3a', '#e8d0a0', 7, { desc: 'La racine de vie.' }],
-    ['pitaya', 'Fruit du dragon', 'exotique', 'cactus', '#4f9a5a', '#ff4f9a', 8, { thirst: 0.5, desc: 'Un cactus qui boit à peine.' }],
-    ['lotus', 'Lotus', 'fleur', 'flower', '#3f8f6a', '#ffb0d0', 8, { center: '#ffd84a', thirst: 2, desc: 'Fleurit sur l\'eau.' }],
-    ['poivre', 'Poivre de Kampot', 'exotique', 'vine', '#2f6a3a', '#3a2a1a', 8, { desc: 'Piquant et rare.' }],
-    ['cosmique', 'Chou cosmique', 'mythique', 'cosmic', '#6a3fc4', '#c7a6ff', 10, { desc: 'Venu d\'ailleurs.' }],
-    ['rose', 'Rose éternelle', 'fleur', 'flower', '#2f6a3a', '#e0302a', 10, { center: '#8a1c1c', desc: 'Ne fane jamais au silo.', shelf: 99999 }],
-    ['orchidee', 'Orchidée lunaire', 'mythique', 'flower', '#3f5f8f', '#c7a6ff', 11, { center: '#ffffff', night: true, desc: 'S\'ouvre au clair de lune.' }],
-    ['magique', 'Haricot magique', 'mythique', 'pod', '#5fd14f', '#7fe3ff', 12, { desc: 'Monte jusqu\'aux nuages.' }],
-    ['melon_celeste', 'Melon céleste', 'mythique', 'ground', '#5a6fd1', '#b9f3ff', 13, { fruit2: '#ffffff', desc: 'Il flotte presque.' }],
-    ['fruit_astral', 'Fruit astral', 'mythique', 'tree', '#3a2a6b', '#ffe14d', 15, { desc: 'Tombé d\'une étoile.' }],
-    ['vide', 'Champignon du vide', 'mythique', 'mushroom', '#1b1040', '#9a7bff', 17, { night: true, desc: 'Pousse dans l\'ombre de rien.' }],
+    ['fraise', 'Fraise', 'baie', 'bush', '#3f9a3a', '#e8372e', 4, { desc: 'Délicieuse, mais périt très vite.' }],
+    ['poivron', 'Poivron', 'fruit', 'vine', '#3f8f34', '#f2b84b', 5, { desc: 'Jaune, rouge ou vert selon l\'humeur.' }],
+    ['pasteque', 'Pastèque', 'fruit', 'ground', '#3f8f34', '#2f8f3a', 6, { fruit2: '#8fd16a', thirst: 1.7, desc: 'Très assoiffée.' }],
+    ['brocoli', 'Brocoli', 'feuille', 'leafy', '#3f7f4a', '#4f9a5a', 6, { desc: 'Un petit arbre comestible.' }],
+    ['tournesol', 'Tournesol', 'fleur', 'flower', '#4f9a3a', '#ffd84a', 7, { center: '#6b4426', desc: 'Suit le soleil : pousse mieux par beau temps.' }],
+    ['riz', 'Riz', 'cereale', 'grain', '#7cc25a', '#f2efe6', 7, { thirst: 2.2, desc: 'Les pieds dans l\'eau.' }],
+    ['champignon', 'Champignon', 'champi', 'mushroom', '#e8dcc8', '#c0392b', 8, { night: true, desc: 'Pousse surtout la nuit.' }],
+    ['asperge', 'Asperge dorée', 'feuille', 'spear', '#8bb84a', '#f2c84b', 9, { desc: 'Un mets de roi.' }],
+    ['ail', 'Ail', 'racine', 'bulb', '#7cc25a', '#f2efe6', 9, { desc: 'Éloigne les vampires et les pucerons.' }],
+    ['framboise', 'Framboise', 'baie', 'bush', '#3f8f34', '#c2185b', 10, { desc: 'Fragile comme tout.' }],
+    ['artichaut', 'Artichaut', 'fleur', 'flower', '#5a8f6a', '#8fae8f', 10, { center: '#7d3fc4', desc: 'Une fleur qu\'on mange avant qu\'elle n\'éclose.' }],
+    ['poireau', 'Poireau', 'feuille', 'stalk', '#4f8f3a', '#e8f2d0', 11, { desc: 'Long et droit.' }],
+    ['melon', 'Melon', 'fruit', 'ground', '#4b9a3a', '#d9c27a', 11, { fruit2: '#b8a35a', desc: 'Parfumé.' }],
+    ['cafe', 'Café', 'exotique', 'tree', '#2f6a3a', '#c0392b', 12, { desc: 'Réveille même le fermier.' }],
+    ['lentille', 'Lentille', 'legumineuse', 'pod', '#6f9a3a', '#a0703a', 12, { desc: 'Petite mais se garde longtemps.' }],
+    ['vanille', 'Vanille', 'exotique', 'vine', '#3f8f34', '#f2e0a0', 13, { desc: 'Une orchidée grimpante.' }],
+    ['cacao', 'Cacao', 'exotique', 'tree', '#2f6a3a', '#a0602f', 13, { desc: 'Le chocolat commence ici.' }],
+    ['safran', 'Safran', 'fleur', 'flower', '#4f9a3a', '#9a4bff', 14, { center: '#ff7a1e', desc: 'L\'or rouge.' }],
+    ['truffe', 'Truffe noire', 'champi', 'mushroom', '#5a4a3a', '#2b1d14', 14, { night: true, desc: 'Le diamant noir, pousse la nuit.' }],
+    ['mandragore', 'Mandragore', 'mythique', 'mandrake', '#5b7f3a', '#d9b48a', 15, { thirst: 0.8, night: true, desc: 'Pousse surtout la nuit.' }],
+    ['ginseng', 'Ginseng', 'racine', 'root', '#4f8f3a', '#e8d0a0', 15, { desc: 'La racine de vie.' }],
+    ['pitaya', 'Fruit du dragon', 'exotique', 'cactus', '#4f9a5a', '#ff4f9a', 16, { thirst: 0.5, desc: 'Un cactus qui boit à peine.' }],
+    ['lotus', 'Lotus', 'fleur', 'flower', '#3f8f6a', '#ffb0d0', 16, { center: '#ffd84a', thirst: 2, desc: 'Fleurit sur l\'eau.' }],
+    ['poivre', 'Poivre de Kampot', 'exotique', 'vine', '#2f6a3a', '#3a2a1a', 17, { desc: 'Piquant et rare.' }],
+    ['cosmique', 'Chou cosmique', 'mythique', 'cosmic', '#6a3fc4', '#c7a6ff', 17, { desc: 'Venu d\'ailleurs.' }],
+    ['rose', 'Rose éternelle', 'fleur', 'flower', '#2f6a3a', '#e0302a', 18, { center: '#8a1c1c', desc: 'Ne fane jamais au silo.', shelf: 99999 }],
+    ['orchidee', 'Orchidée lunaire', 'mythique', 'flower', '#3f5f8f', '#c7a6ff', 18, { center: '#ffffff', night: true, desc: 'S\'ouvre au clair de lune.' }],
+    ['magique', 'Haricot magique', 'mythique', 'pod', '#5fd14f', '#7fe3ff', 18, { desc: 'Monte jusqu\'aux nuages.' }],
+    ['melon_celeste', 'Melon céleste', 'mythique', 'ground', '#5a6fd1', '#b9f3ff', 19, { fruit2: '#ffffff', desc: 'Il flotte presque.' }],
+    ['fruit_astral', 'Fruit astral', 'mythique', 'tree', '#3a2a6b', '#ffe14d', 19, { desc: 'Tombé d\'une étoile.' }],
+    ['vide', 'Champignon du vide', 'mythique', 'mushroom', '#1b1040', '#9a7bff', 20, { night: true, desc: 'Pousse dans l\'ombre de rien.' }],
     ['arbre_monde', 'Arbre-monde', 'mythique', 'tree', '#2f8f3a', '#ffd84a', 20, { desc: 'La fin du voyage : il porte toutes les saisons.' }],
   ];
 
-  const eraCount = {};
+  const eraIndex = {};
   const SEEDS = SEED_LIST.map(([id, name, fam, shape, leaf, fruit, pr, o = {}], i) => {
-    const k = eraCount[pr] = (eraCount[pr] || 0) + 1;
+    const k = eraIndex[pr] = eraIndex[pr] == null ? 0 : eraIndex[pr] + 1;
     const unlock = i === 0 ? 0 : pr === 0 ? ECO.unlockBase * Math.pow(ECO.unlockR, i - 1)
-      : threshold(pr) * (ECO.eraUnlock[k - 1] != null ? ECO.eraUnlock[k - 1] : ECO.eraUnlock[ECO.eraUnlock.length - 1] * 4);
+      : threshold(pr - 1) * ECO.eraMult[Math.min(k, ECO.eraMult.length - 1)] * Math.pow(10, Math.max(0, k - ECO.eraMult.length + 1));
     return {
-      id, name, fam, shape, leaf, fruit, pr, rank: i, thirst: 1, desc: '', ...o,
+      id, name, fam, shape, leaf, fruit, pr, eraK: k, rank: i, thirst: 1, desc: '', ...o,
       value: o.value || Math.round(Math.pow(ECO.valueR, i) * 100) / 100,
       grow: o.grow || Math.min(ECO.growMax, Math.round(ECO.growBase * Math.pow(ECO.growR, i))),
       unlock: o.unlock != null ? o.unlock : Math.round(unlock),
@@ -268,6 +274,12 @@
   // Toutes les améliorations à niveaux se renchérissent assez vite pour que la ferme progresse sans exploser :
   // la somme des « rendements » (effet par niveau / hausse de prix) doit rester < 1. Vérifier avec tools/sim-life.js.
   const COST_CURVE = 3;
+  // Une amélioration de famille n'apparaît qu'avec le premier légume de cette famille.
+  const famEra = fam => Math.min(...SEEDS.filter(sd => sd.fam === fam).map(sd => sd.pr));
+  for (const u of UPGRADES) {
+    const fams = (u.fx || []).map(f => f.fam).filter(Boolean);
+    if (fams.length) u.pr = Math.max(u.pr || 0, Math.min(...fams.map(famEra)));
+  }
   for (const u of UPGRADES) if (u.g > 1 && u.max > 1 && u.max < 999) u.g = Math.round(Math.pow(u.g, COST_CURVE) * 100) / 100;
 
   // Miniaturisation : une fois MINI.need robots d'un modèle, ils peuvent devenir minuscules (plus discrets, un peu moins efficaces).
@@ -734,7 +746,7 @@
   };
   for (const p of PETS) p.paths = PET_PATHS[p.id] || [];
   // Coût des compagnons légendaires : proportionnel au seuil de renaissance de leur ère.
-  for (const p of PETS) if (p.pr && !p.cost) p.cost = Math.round(threshold(p.pr) * 0.02);
+  for (const p of PETS) if (p.pr && !p.cost) p.cost = Math.round(threshold(p.pr - 1) * 0.3);
 
   const ACH_BONUS = 0.02;
 

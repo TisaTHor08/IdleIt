@@ -7,10 +7,11 @@ const run = (g, secs) => { for (let t = 0; t < secs; t += 0.1) g.tick(0.1); };
 // --- Renaissance : peu de graines d'or, seuil qui grandit, ères débloquées ---
 const g = new Game(null);
 assert.strictEqual(g.prestigeGain(), 0, 'rien avant le seuil');
-assert.ok(g.locked('seed', 'fraise'), 'fraise verrouillée avant la 1re renaissance');
-g.s.runEarned = D.PRESTIGE.base;
+const era1 = D.SEEDS.find(sd => sd.pr === 1).id, era2 = D.SEEDS.find(sd => sd.pr === 2).id;
+assert.ok(g.locked('seed', era1), era1 + ' verrouillé avant la 1re renaissance');
+g.s.runEarned = D.threshold(0);
 assert.strictEqual(g.prestigeGain(), D.PRESTIGE.gsBase, 'gain au seuil');
-g.s.runEarned = D.PRESTIGE.base * 1000;
+g.s.runEarned = D.threshold(0) * 1000;
 const big = g.prestigeGain();
 assert.ok(big < 40, 'même ×1000 le seuil, le gain reste modeste : ' + big);
 g.s.money = 1e6;
@@ -20,9 +21,9 @@ assert.ok(g.prestige(), 'renaissance');
 assert.strictEqual(g.s.pets.list[0].xp, 0, 'compagnon remis au niveau 0');
 assert.strictEqual(g.harvestRate(), 0, 'les revenus récents repartent de zéro');
 assert.strictEqual(g.petSlots(), 2, 'un emplacement de plus');
-assert.ok(!g.locked('seed', 'fraise'), 'fraise débloquée');
-assert.ok(g.locked('seed', 'brocoli'), 'brocoli encore verrouillé');
-assert.ok(g.prestigeThreshold() === D.PRESTIGE.base * D.PRESTIGE.growth, 'seuil ×growth');
+assert.ok(!g.locked('seed', era1), era1 + ' débloqué');
+assert.ok(g.locked('seed', era2), era2 + ' encore verrouillé');
+assert.ok(g.prestigeThreshold() > D.threshold(0) * 20, 'le seuil grandit');
 assert.ok(!('autoBuy' in g.s) && !D.PERKS.some(p => /auto/.test(p.id)), "plus d'achat automatique");
 
 // --- Deux compagnons (le même ou un autre) ---

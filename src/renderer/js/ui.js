@@ -608,7 +608,7 @@
         const T = g.prestigeThreshold();
         const next = D.SEEDS.filter(sd => sd.pr === g.prestiges() + 1).map(sd => sd.name);
         setHtml(info, `Graines d'or : <b>${fmt(g.gsAvailable())}</b> disponibles · ${fmt(g.s.gsTotal)} gagnées au total (revenus <b>+${fmt(g.s.gsTotal * D.PRESTIGE.bonus * 100)}%</b>)<br>`
-          + `Renaissances : <b>${g.prestiges()}</b> · gagné pendant cette partie : <b>${fmt(g.s.runEarned)} $</b> / seuil <b>${fmt(T)} $</b> (le seuil est multiplié par ${D.PRESTIGE.growth} à chaque renaissance)`
+          + `Renaissances : <b>${g.prestiges()}</b> · gagné pendant cette partie : <b>${fmt(g.s.runEarned)} $</b> / seuil <b>${fmt(T)} $</b> (seuil suivant : <b>${fmt(D.threshold(g.prestiges() + 1))} $</b>)`
           + `<br>Renaître maintenant rapporte <b>${fmt(gain)}</b> graine(s) d'or` + (gain ? ` <span class="muted">(aller plus loin en rapporte un peu plus : ${D.PRESTIGE.gsBase} × (gagné / seuil)^${D.PRESTIGE.gsExp})</span>` : '')
           + (next.length ? `<br>La prochaine renaissance débloque : <b>${next.join(', ')}</b>` : '')
           + (g.s.migratedFrom ? '<br><span class="muted">Ta partie vient d\'une ancienne version : tes graines d\'or ont été converties (12 par renaissance) et tes talents remboursés.</span>' : ''));

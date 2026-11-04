@@ -9,7 +9,7 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 - 9 compagnons (dont 4 légendaires) avec arbre de talents, évolution, 3 voies chacun et une maîtrise
 - Un marché vivant : silos, cours, pénuries, krachs, commandes, produits qui s'abîment
 - Météo (8 temps), orages et éclairs, 13 événements aléatoires, 8 mutations, cultures denses
-- 32 talents de renaissance, 85 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde
+- 32 talents de renaissance, 85 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
 - Sauvegarde 100 % automatique, compatible avec un dossier synchronisé (NAS, cloud)
 
 ---
@@ -51,7 +51,7 @@ Le pinceau sert à choisir quoi planter : sélectionne une graine puis clique su
 
 Chaque légume rapporte plus que le précédent, mais pousse plus lentement et coûte bien plus cher à débloquer. Les légumes sont classés en **familles** (racines, céréales, feuilles, fruits, légumineuses, baies, fleurs, champignons, exotiques, mythiques). Chaque famille a ses outils (grelinette, fléau, serpette, cueilleur…), ses améliorations de culture (buttes, sillons, voiles, tuteurs…) et sa durée de conservation au silo.
 
-Au départ, seuls les 12 légumes du potager (radis → citrouille) existent. Chaque **renaissance** ouvre une nouvelle ère : fraises et poivrons, puis brocoli et riz, champignons, framboises… jusqu'aux légumes mythiques (chou cosmique, haricot magique, fruit astral) et, tout au bout, l'**Arbre-monde** (20 renaissances).
+Au départ, seuls 7 légumes du potager (radis → haricot vert) existent. Chaque **renaissance** ouvre une nouvelle ère avec 1 à 3 légumes : chou, oignon et maïs, aubergine, citrouille et fraise, brocoli, champignons… jusqu'aux légumes mythiques (chou cosmique, haricot magique, fruit astral) et, tout au bout, l'**Arbre-monde** (20 renaissances).
 
 ### Champ, outils et robots
 
@@ -117,7 +117,7 @@ Et de temps en temps, un événement aléatoire :
 
 ### Renaissance
 
-Une fois le **seuil** atteint (1 milliard de $ gagnés dans la partie, puis plus à chaque fois), tu peux renaître : la ferme repart de zéro contre des **graines d'or**. Elles donnent +1 % de revenus chacune et s'échangent contre des **talents de renaissance** ciblés : argent et parcelles de départ, graine débloquée d'avance, robots d'une génération, une famille de légumes, la pluie, les événements heureux, les compagnons, le commerce…
+Une fois le **seuil** atteint (300 M$ gagnés dans la partie la première fois, environ ×10 à chaque renaissance), tu peux renaître : la ferme repart de zéro contre des **graines d'or**. Elles donnent +1 % de revenus chacune et s'échangent contre des **talents de renaissance** ciblés : argent et parcelles de départ, graine débloquée d'avance, robots d'une génération, une famille de légumes, la pluie, les événements heureux, les compagnons, le commerce…
 
 Les graines d'or sont rares : aller bien au-delà du seuil en rapporte un peu plus, mais pas beaucoup. Chaque renaissance débloque surtout de **nouveaux légumes, robots, améliorations et compagnons**.
 
@@ -168,7 +168,7 @@ python tools/readme-shots.py        # recadre tools/shots pour docs/img
 
 Les captures s'exécutent dans une fenêtre à 1 % d'opacité (invisible à l'écran) qui se ferme toute seule.
 
-`sim-life.js` joue avec un acheteur glouton et accepte des réglages d'essai par variables d'environnement (`PGROW`, `PBASE`, `UNLR`, `GPOW`/`GALL`, `TPOW`, `RPOW`, `DT`, `TRACE=secondes`). Repère clé : la somme des « rendements » de tout ce qui s'achète (effet par niveau / hausse de prix par niveau) doit rester inférieure à 1, sinon chaque partie finit en explosion de quelques minutes. C'est le rôle de `COST_CURVE` dans data.js.
+`sim-life.js` joue avec un acheteur glouton (`PNOW=1` : renaît dès le seuil) et accepte des réglages d'essai par variables d'environnement (`UNLR`, `VALR`, `GPOW`/`GALL`, `TPOW`, `RPOW`, `DT`, `TRACE=secondes`). `CALIB=1` recalibre les seuils : chaque partie dure `CALIB_A + CALIB_B × renaissances` heures et son seuil devient ce que le bot a gagné ; on lisse ensuite la courbe avant de la reporter dans `PRESTIGE.thresholds`. Vérification actuelle : 155 à 160 h pour 20 renaissances. Repère clé : la somme des « rendements » de tout ce qui s'achète (effet par niveau / hausse de prix par niveau) doit rester inférieure à 1, sinon chaque partie finit en explosion de quelques minutes. C'est le rôle de `COST_CURVE` dans data.js.
 
 ### Ajouter du contenu
 
@@ -176,7 +176,7 @@ Presque tout se trouve dans [src/renderer/js/data.js](src/renderer/js/data.js) :
 
 | Quoi | Tableau | Notes |
 |---|---|---|
-| Légume | `SEED_LIST` | `[id, nom, famille, forme, feuillage, fruit, pr, options]`. Valeur, temps de pousse, prix et conservation sont calculés (`ECO`, `FAMILIES`). Formes dans `drawPlant` de [sprites.js](src/renderer/js/sprites.js) : `root`, `leafy`, `vine`, `stalk`, `spear`, `ground`, `mandrake`, `cosmic`, `grain`, `tuber`, `pod`, `bulb`, `bush`, `flower`, `mushroom`, `tree`, `cactus`. |
+| Légume | `SEED_LIST` | `[id, nom, famille, forme, feuillage, fruit, pr, options]`. Valeur, temps de pousse, prix et conservation sont calculés (`ECO`, `FAMILIES`) ; les améliorations d'une famille apparaissent avec son premier légume. Formes dans `drawPlant` de [sprites.js](src/renderer/js/sprites.js) : `root`, `leafy`, `vine`, `stalk`, `spear`, `ground`, `mandrake`, `cosmic`, `grain`, `tuber`, `pod`, `bulb`, `bush`, `flower`, `mushroom`, `tree`, `cactus`. |
 | Famille | `FAMILIES` | Nom et durée de conservation au silo (s). |
 | Robot | `ROBOTS` | `walk`, `act`, `fly`, `only` (robot spécialisé), `tag` (ancien, moderne, volant, futur), `hub`, `scare`, `noBattery`, `drain`. Couleurs dans `ROBOT_PAL` de sprites.js. |
 | Amélioration | `UPGRADES` | `tab` : `outils`, `champ`, `robots`, `marche`. Effet générique avec `fx: [{ k, mult \| add, fam, seed, robot, tag, ev }]` (lu par `fxMul`/`fxAdd` de core.js), ou codé avec `this.lvl('id')`. `g` est élevé à `COST_CURVE`. |
@@ -191,7 +191,7 @@ Presque tout se trouve dans [src/renderer/js/data.js](src/renderer/js/data.js) :
 | Culture dense | `DENSE` | Plants, `costMult`, `growth`. |
 | Mutation | `MUTATIONS` | `value`, `harvest`, `growth`, `fail`, `mold`, `infinite`, `catcher`, `good`. |
 | Succès | `ACHIEVEMENTS` | `check: g => …` (`g.s` = état sauvegardé). |
-| Renaissance | `PRESTIGE` | Seuil `base × growth^renaissances`, gain `gsBase × (gagné / seuil)^gsExp`, emplacements de compagnons. |
+| Renaissance | `PRESTIGE` | Seuils `thresholds` (calibrés, ×1000 par renaissance au-delà), gain `gsBase × (gagné / seuil)^gsExp`, emplacements de compagnons. Les légumes d'une ère coûtent `ECO.eraMult` × le seuil précédent. |
 
 ### Structure
 

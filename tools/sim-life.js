@@ -6,17 +6,24 @@ const { Game } = require('../src/renderer/js/core.js');
 const maxHours = +process.argv[2] || 200;
 const goal = +process.argv[3] || 20;
 if (process.env.GPOW) for (const u of D.UPGRADES) if ((u.fx || process.env.GALL) && u.g > 1 && u.max > 1 && u.max < 999) u.g = Math.pow(u.g, +process.env.GPOW);
-// Réglages d'essai (env) : les prix des graines d'ères suivent le seuil de renaissance.
-const oldT = p => D.threshold(p);
-const T0 = D.SEEDS.map(sd => oldT(sd.pr));
-if (process.env.PGROW) D.PRESTIGE.growth = +process.env.PGROW;
+// Réglages d'essai (env).
+if (process.env.PSTEP) D.PRESTIGE.step = +process.env.PSTEP;
+if (process.env.PSG) D.PRESTIGE.stepGrow = +process.env.PSG;
 if (process.env.PBASE) D.PRESTIGE.base = +process.env.PBASE;
-if (process.env.PACC) D.PRESTIGE.accel = +process.env.PACC;
-D.SEEDS.forEach((sd, i) => { if (sd.pr > 0) sd.unlock *= D.threshold(sd.pr) / T0[i]; });
+if (process.env.UNLR) { D.ECO.unlockR = +process.env.UNLR; D.SEEDS.forEach(sd => { if (sd.rank > 0) sd.unlock = D.ECO.unlockBase * Math.pow(D.ECO.unlockR, sd.rank - 1); }); }
 if (process.env.VALR) D.SEEDS.forEach(sd => { sd.value = Math.pow(+process.env.VALR, sd.rank); });
 if (process.env.TPOW) for (const t of D.TALENTS) if (t.g > 1) t.g = Math.pow(t.g, +process.env.TPOW);
-if (process.env.UNLR) D.SEEDS.forEach(sd => { if (sd.pr === 0 && sd.rank > 0) sd.unlock = D.ECO.unlockBase * Math.pow(+process.env.UNLR, sd.rank - 1); });
 if (process.env.RPOW) for (const r of D.ROBOTS) r.g = Math.pow(r.g, +process.env.RPOW);
+const CALIB = !!process.env.CALIB;
+const calibHours = p => (+process.env.CALIB_A || 4.5) + (+process.env.CALIB_B || 0.32) * p;
+// Fixe le seuil n° p et en déduit les prix de l'ère suivante (mêmes règles que data.js).
+function setThreshold(p, T) {
+  D.PRESTIGE.thresholds[p] = T;
+  const M = D.ECO.eraMult;
+  for (const sd of D.SEEDS) if (sd.pr === p + 1) sd.unlock = T * M[Math.min(sd.eraK, M.length - 1)] * Math.pow(10, Math.max(0, sd.eraK - M.length + 1));
+  for (const pet of D.PETS) if (pet.pr === p + 1) pet.cost = Math.round(T * 0.3);
+}
+if (CALIB) D.PRESTIGE.thresholds.length = 1;
 const game = new Game(null);
 const PET_ORDER = ['poussin', 'chat', 'abeille', 'taupe', 'chien', 'poussin'];
 
@@ -89,9 +96,15 @@ for (; t < maxHours * 3600 && runs.length < goal; t += dt) {
   if (step % Math.round(10 / dt) === 0) {
     const frac = game.s.runEarned / game.prestigeThreshold();
     for (const m of [0.001, 0.01, 0.1]) if (frac >= m && marks[m] == null) marks[m] = t - runStart;
+    // Calibrage (CALIB=1) : la partie n° p+1 dure exactement calibHours(p) ; son seuil devient ce qui a été gagné.
+    if (CALIB) {
+      const p = game.prestiges();
+      if (t - runStart >= calibHours(p) * 3600) setThreshold(p, game.s.runEarned);
+      else D.PRESTIGE.thresholds[p] = Infinity;
+    }
     const gain = game.prestigeGain();
     if (gain > 0 && crossedAt == null) crossedAt = t;
-    if (gain > 0 && (gain >= 2 * D.PRESTIGE.gsBase || t - crossedAt > 0.4 * (crossedAt - runStart))) {
+    if (gain > 0 && (CALIB || process.env.PNOW || gain >= 2 * D.PRESTIGE.gsBase || t - crossedAt > 0.4 * (crossedAt - runStart))) {
       const mk = [0.001, 0.01, 0.1].map(m => marks[m] != null ? (marks[m] / 3600).toFixed(1) : '-').join('/');
       const sd = D.SEEDS.find(x => x.id === game.bestSeed());
       const why = `vM ${D.fmt(game.valueMult())} hM ${D.fmt(game.harvestMult(sd, 'robot'))} fxV ${D.fmt(game.fxValue(sd))} gM ${D.fmt(game.growthMult())} plants ${game.s.plots.reduce((a, p, i) => a + game.plotPlants(i), 0)} rob ${Object.values(game.s.robots).reduce((a, b) => a + b, 0)} ach ${game.achCount()} pm.v ${D.fmt(game.pm.valueAll)}`;
@@ -106,3 +119,4 @@ for (; t < maxHours * 3600 && runs.length < goal; t += dt) {
 }
 console.log(`\nFin : ${runs.length} renaissances en ${(t / 3600).toFixed(1)} h · revenu ${D.fmt(game.incomeRate())}/s · gagné ${D.fmt(game.s.runEarned)} / seuil ${D.fmt(game.prestigeThreshold())}`);
 console.log('Talents d\'or :', JSON.stringify(game.s.perks));
+if (CALIB) console.log('Seuils calibrés :', JSON.stringify(D.PRESTIGE.thresholds.filter(isFinite).map(x => +x.toPrecision(3))));
