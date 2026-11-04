@@ -309,5 +309,41 @@ app.on('before-quit', e => {
   setTimeout(() => app.quit(), 400);
 });
 
+// ---------- Mise à jour automatique (releases GitHub) ----------
+// Version installée : la nouvelle version est téléchargée en arrière-plan, puis la partie est sauvegardée,
+// l'installeur tourne en silence et la ferme se relance toute seule (la sauvegarde, hors du dossier
+// d'installation, est conservée). Version portable : un exe ne peut pas se remplacer lui-même, on prévient
+// seulement le joueur avec un lien vers la release.
+const UPDATE_EVERY = 4 * 3600 * 1000;
+const RELEASES_URL = 'https://github.com/TisaTHor08/IdleIt/releases/latest';
+function setupAutoUpdate() {
+  if (!app.isPackaged || process.argv.some(a => a === '--farm-shots' || a === '--farm-savetest')) return;
+  let autoUpdater;
+  try { ({ autoUpdater } = require('electron-updater')); } catch (e) { console.error('electron-updater absent', e); return; }
+  const portable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+  autoUpdater.autoDownload = !portable;
+  autoUpdater.autoInstallOnAppQuit = !portable;
+  let notified = null;
+  autoUpdater.on('error', e => console.error('Mise à jour :', e && e.message));
+  autoUpdater.on('update-available', info => {
+    if (!portable || notified === info.version || !tray) return;
+    notified = info.version;
+    tray.displayBalloon({ title: 'IdleIt Ferme ' + info.version + ' disponible',
+      content: 'Clique ici pour télécharger la nouvelle version portable.', iconType: 'info' });
+    tray.once('balloon-click', () => shell.openExternal(RELEASES_URL));
+  });
+  autoUpdater.on('update-downloaded', info => {
+    if (portable) return;
+    if (tray) tray.displayBalloon({ title: 'Mise à jour ' + info.version, content: 'La ferme se met à jour et redémarre…', iconType: 'info' });
+    // Dernière sauvegarde, puis installation silencieuse et relance.
+    if (win && !win.isDestroyed()) win.webContents.send('flush-save');
+    setTimeout(() => { quitting = true; autoUpdater.quitAndInstall(true, true); }, 1500);
+  });
+  const check = () => autoUpdater.checkForUpdates().catch(e => console.error('Mise à jour :', e && e.message));
+  setTimeout(check, 30 * 1000);
+  setInterval(check, UPDATE_EVERY);
+}
+app.whenReady().then(setupAutoUpdate);
+
 ipcMain.on('hide', () => { if (win) win.hide(); });
 ipcMain.on('quit', () => app.quit());

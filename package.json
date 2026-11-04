@@ -34,13 +34,24 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "IdleIt-Ferme-Setup-${version}.${ext}"
     },
     "portable": {
       "artifactName": "IdleIt-Ferme-portable-${version}.exe"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "TisaTHor08",
+        "repo": "IdleIt"
+      }
+    ]
   },
   "allowScripts": {
     "electron@33.4.11": true
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

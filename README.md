@@ -18,8 +18,10 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 
 Télécharge l'un des deux fichiers de `dist/` (ou génère-les, voir [Développement](#développement)) :
 
-- **`IdleIt Ferme Setup x.y.z.exe`** : installateur. Pour mettre à jour, lance simplement le nouvel installateur par-dessus l'ancien : **ta progression est conservée**.
+- **`IdleIt-Ferme-Setup-x.y.z.exe`** : installateur. Pour mettre à jour, lance simplement le nouvel installateur par-dessus l'ancien : **ta progression est conservée**.
 - **`IdleIt-Ferme-portable-x.y.z.exe`** : version portable, sans installation (même sauvegarde que la version installée).
+
+**Mises à jour automatiques** : la version installée vérifie les [releases GitHub](https://github.com/TisaTHor08/IdleIt/releases) au démarrage puis toutes les 4 h. Si une version plus récente existe, elle est téléchargée en arrière-plan, la partie est sauvegardée, puis la ferme s'installe et redémarre toute seule. La version portable affiche seulement une notification avec le lien de téléchargement.
 
 La ferme apparaît en bas de l'écran, juste au-dessus de la barre des tâches.
 
