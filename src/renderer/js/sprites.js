@@ -937,6 +937,31 @@
         if (seed.id === 'vide' && g >= 1) px(ctx, cx - 3 + (Math.floor(t * 3) % 7), gy - h - 4, 1, 1, '#c9b8ff');
         break;
       }
+      case 'fir': { // sapin de Noël : étages de branches en triangle, tronc, boules et étoile
+        const tiers = 1 + Math.round(g * 3), tierH = 3;
+        const trunk = g > 0.3 ? 2 : 1;
+        px(ctx, cx, gy - trunk, 1, trunk, '#7a5230');
+        let top = gy - trunk;
+        for (let k = 0; k < tiers; k++) {
+          const base = Math.max(1, tiers - k) + 1; // demi-largeur de la base de cet étage
+          for (let r = 0; r < tierH; r++) {
+            const half = Math.max(0, base - (tierH - 1 - r));
+            px(ctx, cx - half, top - tierH + r, half * 2 + 1, 1, (r + k) % 2 ? leaf : leafD);
+          }
+          top -= tierH - 1;
+        }
+        if (g >= 0.6) {
+          // boules (couleur du fruit et dorées) sur les bords des étages
+          const cols = [fruit, '#ffd84a', '#9fd8ff'];
+          for (let k = 0; k < tiers; k++) {
+            const y = gy - trunk - 1 - k * (tierH - 1), half = Math.max(1, tiers - k) + 1;
+            px(ctx, cx - half + 1, y, 1, 1, cols[k % 3]);
+            if (half > 1) px(ctx, cx + half - 1, y - 1, 1, 1, cols[(k + 1) % 3]);
+          }
+        }
+        if (g >= 1) { px(ctx, cx, top - 2, 1, 1, '#ffd84a'); px(ctx, cx - 1, top - 1, 3, 1, '#ffd84a'); px(ctx, cx, top, 1, 1, '#fff1a8'); }
+        break;
+      }
       case 'tree': { // café, cacao, fruit astral, arbre-monde : tronc et houppier
         const big = seed.id === 'arbre_monde' ? 1.6 : 1;
         const h = 2 + Math.round(g * 6 * big), r = 1 + Math.round(g * 3 * big);

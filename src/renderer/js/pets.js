@@ -19,7 +19,9 @@
     Object.assign(G, {
       // ---------- Emplacements ----------
       // 1 + 1 par renaissance ; une sauvegarde éditée peut en avoir plus : on les montre tous.
-      petSlots() { return Math.max(this.s.pets.list.length, Math.min(D.PRESTIGE.maxPetSlots, D.PRESTIGE.petSlots + (this.s.stats.prestiges || 0))); },
+      petSlots() { return Math.max(this.s.pets.list.length, D.PRESTIGE.petSlotAt.filter(p => p <= (this.s.stats.prestiges || 0)).length); },
+      // Renaissance qui donne le prochain emplacement (null s'il n'y en a plus).
+      nextPetSlotAt() { const p = this.s.stats.prestiges || 0; const n = D.PRESTIGE.petSlotAt.find(x => x > p); return n == null ? null : n; },
       petList() { return this.s.pets.list; },
       petByUid(uid) { return this.s.pets.list.find(p => p.uid === uid) || null; },
       petCost(id) { return PET_BY_ID[id].cost * this.fxMul('petCost'); },

@@ -21,6 +21,8 @@ assert.ok(g.prestige(), 'renaissance');
 assert.strictEqual(g.s.pets.list[0].xp, 0, 'compagnon remis au niveau 0');
 assert.strictEqual(g.harvestRate(), 0, 'les revenus récents repartent de zéro');
 assert.strictEqual(g.petSlots(), 2, 'un emplacement de plus');
+const slotsAt = p => { const x = new Game(null); x.s.stats.prestiges = p; return x.petSlots(); };
+assert.deepStrictEqual([0, 1, 3, 4, 9, 10, 19, 20, 30].map(slotsAt), [1, 2, 2, 3, 3, 4, 4, 5, 5], 'emplacements aux renaissances 1, 4, 10 et 20');
 assert.ok(!g.locked('seed', era1), era1 + ' débloqué');
 assert.ok(g.locked('seed', era2), era2 + ' encore verrouillé');
 assert.ok(g.prestigeThreshold() > D.threshold(0) * 20, 'le seuil grandit');

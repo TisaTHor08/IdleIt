@@ -104,5 +104,15 @@ assert.strictEqual(back.s.pets.list[0].food, food.id, 'gamelle de saison sauvega
 h.equipFood(pet, null);
 assert.ok(!h.s.pantry[food.id], 'retirée, elle est détruite');
 for (const f of D.PET_FOODS.filter(x => x.season)) assert.ok(f.ingredients.every(i => D.SEASON_SEEDS.find(x => x.id === i.seed).season === f.season), f.id + ' : ingrédients de sa saison');
+for (const f of D.PET_FOODS.filter(x => x.season)) {
+  assert.ok(f.special.length >= 3, f.id + ' : au moins 3 compagnons spécifiques');
+  for (const x of f.special) assert.ok(x.pet && x.malus && x.desc, f.id + '/' + x.pet + ' : effet et contrepartie');
+  for (const p of D.PETS) for (const path of [null, ...p.paths.map(q => q.id)]) {
+    const e = D.foodEffect(p.id, path, f.id);
+    assert.ok(e && e.malus, `${f.id} / ${p.id} / ${path} : contrepartie affichée`);
+    const pm = h.petMods({ uid: 9, id: p.id, xp: 1e12, nodes: Object.fromEntries(p.nodes.map(n => [n.id, n.max])), path, mastery: {}, food: f.id });
+    assert.ok(Number.isFinite(pm.valueAll), `${f.id} / ${p.id} / ${path}`);
+  }
+}
 console.log('gamelles de saison : OK');
 console.log('saisons : OK');

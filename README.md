@@ -6,7 +6,7 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 ![La ferme au-dessus de la barre des tâches](docs/img/band.png)
 
 - 44 légumes répartis en 10 familles et 17 ères, 16 robots, 69 améliorations, 28 talents de spécialisation
-- 9 compagnons (dont 4 légendaires) avec arbre de talents, évolution, 3 voies chacun et une maîtrise
+- 9 compagnons (dont 4 légendaires) avec arbre de talents, évolution, 3 voies chacun et une maîtrise ; jusqu'à 5 emplacements
 - Un marché vivant : silos, cours, pénuries, krachs, commandes, produits qui s'abîment
 - Météo (8 temps), orages et éclairs, 13 événements aléatoires, 8 mutations, cultures denses
 - Une **usine de transformation** (fin de partie) : 6 machines, 17 recettes, tapis, robots, frigos, trader et gestionnaire
@@ -76,7 +76,7 @@ Trois branches (Mécanique, Botanique, Paysannerie) et deux doctrines exclusives
 
 Adopte un animal : chacun a un bonus, un malus et un **arbre de talents**. Il gagne de l'XP quand la ferme récolte et quand tu le caresses. Une fois évolué (poussin → coq, chien → chien de berger…) et au niveau 20, il choisit l'une de ses **3 voies** (Basilic, Phénix ou Rapace pour le coq, par exemple), puis continue de progresser en **maîtrise** (force, sagesse, éclat, rayonnement).
 
-À chaque renaissance, tes compagnons reviennent au niveau 0, mais tu gagnes un **emplacement** de plus (jusqu'à 6) : le même animal en double, ou un autre. Les **compagnons légendaires** ne s'adoptent qu'après plusieurs renaissances, et sont bien plus puissants :
+À chaque renaissance, tes compagnons reviennent au niveau 0. De nouveaux **emplacements** arrivent à des renaissances de plus en plus espacées : 2e emplacement à la 1re renaissance, puis aux 4e, 10e et 20e (5 au total). Tu peux y mettre le même animal en double, ou un autre. Les **compagnons légendaires** ne s'adoptent qu'après plusieurs renaissances, et sont bien plus puissants :
 
 | Compagnon | Après | Points forts | Voies |
 |---|---|---|---|
@@ -178,6 +178,8 @@ Sept fêtes changent la ferme pendant 3 semaines (10 jours avant et après la da
 | Fête de la musique (21 juin) | Calebasse, lavande | Smoothie de festival : plantes +15 %, mais +50 % de corbeaux |
 | Halloween (31 octobre) | Potiron hanté, herbe de sorcière | Bonbon au potiron : chasse chaque corbeau (×3), mais nuits plus longues |
 | Noël (25 décembre) | Sapin, houx | Pain d'épices : marchand ×4 toutes les 4 min, mais plantes -10 % |
+
+Chaque gamelle de saison a aussi des **effets spéciaux** propres à 3 ou 4 compagnons (chat de sorcière, renne du Père Noël, coq du zodiaque, hibou DJ…), chacun avec sa contrepartie.
 
 ### Renaissance
 

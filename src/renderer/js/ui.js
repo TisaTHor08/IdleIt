@@ -581,7 +581,7 @@
         const need = f.ingredients.map(i => `${Math.min(g.s.basket[i.seed] || 0, i.n)} / ${i.n} ${C.SEED_BY_ID[i.seed].name}`).join(' · ');
         items.push({
           key: 'sf-' + f.id, icon: S.iconURL('food', 3), title: f.name + ' (gamelle de saison)', level: (g.s.pantry[f.id] || 0) ? `${g.s.pantry[f.id]} au placard` : '',
-          desc: `${f.any.desc} <span style="color:var(--bad)">Contrepartie : ${f.any.malus}.</span> <span class="muted">Ingrédients : ${need} + ${fmt(g.seasonFoodFee())} $. Se cuisine seulement pendant la fête, se garde ensuite. La retirer la détruit.</span>`,
+          desc: `${f.any.desc} <span style="color:var(--bad)">Contrepartie : ${f.any.malus}.</span>${f.special.length ? ` <span style="color:var(--gold)">Effets spéciaux : ${f.special.map(x => C.PET_BY_ID[x.pet].name).join(', ')}.</span>` : ''} <span class="muted">Ingrédients : ${need} + ${fmt(g.seasonFoodFee())} $. Se cuisine seulement pendant la fête, se garde ensuite. La retirer la détruit.</span>`,
           buttons: [{ id: 'c', label: 'Cuisiner', cls: 'gold', enabled: g.canCraftSeasonFood(f.id), onClick: () => g.craftSeasonFood(f.id) }],
         });
       }
@@ -630,7 +630,7 @@
         this.petMastHead.classList.toggle('hidden', !pet || !pet.path);
         setHtml(this.petListHead, pet ? 'Remplacer ce compagnon <span class="muted">(sa progression sera perdue)</span>' : 'Adopter un compagnon dans cet emplacement');
         if (!pet) {
-          setHtml(head, `Emplacement ${this.petSlot + 1} libre. Tu as <b>${g.petSlots()}</b> emplacement(s) : un de plus à chaque renaissance (jusqu'à ${D.PRESTIGE.maxPetSlots}). Le même animal peut en occuper plusieurs.`);
+          setHtml(head, `Emplacement ${this.petSlot + 1} libre. Tu as <b>${g.petSlots()}</b> emplacement(s)` + (g.nextPetSlotAt() != null ? ` ; le prochain arrive à la renaissance n° ${g.nextPetSlotAt()} (emplacements aux renaissances ${D.PRESTIGE.petSlotAt.slice(1).join(', ')}).` : ' : le maximum.') + ' Le même animal peut en occuper plusieurs.');
           return;
         }
         const def = C.PET_BY_ID[pet.id], pr = g.petProgress(pet);
@@ -738,7 +738,7 @@
       body.appendChild(info);
       const act = el('div', 'set');
       const btn = el('button', 'buy gold');
-      act.appendChild(el('span', 'muted', 'Recommence avec des graines d\'or. Tu gardes les succès, les talents, les compagnons (remis au niveau 0) et tu gagnes un emplacement de compagnon. Chaque renaissance débloque de nouvelles graines, robots et améliorations.'));
+      act.appendChild(el('span', 'muted', 'Recommence avec des graines d\'or. Tu gardes les succès, les talents, les compagnons (remis au niveau 0), et certaines renaissances donnent un emplacement de compagnon de plus. Chaque renaissance débloque de nouvelles graines, robots et améliorations.'));
       act.appendChild(btn);
       body.appendChild(act);
       this.perkBoxes = {};

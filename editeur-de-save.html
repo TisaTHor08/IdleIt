@@ -45,7 +45,7 @@
 </head>
 <body>
 <header>
-  <h1>Éditeur de sauvegarde · Farmling</h1><span class="muted">v0.14.0</span>
+  <h1>Éditeur de sauvegarde · Farmling</h1><span class="muted">v0.15.0</span>
   <span id="status" class="muted"></span>
   <span class="grow"></span>
   <label><input type="file" id="file" accept=".json,application/json" hidden><button id="open">Ouvrir…</button></label>
@@ -75,7 +75,9 @@
   // environ 5.5 h + 0.27 h × p avec un joueur efficace (≈ 160 h pour 20 renaissances), puis lissés. Au-delà du tableau : ×1000 par renaissance.
   const PRESTIGE = {
     thresholds: [3e8, 2.4e13, 2.3e14, 2.2e15, 2.1e16, 2e17, 1.9e18, 1.9e19, 1.8e20, 1.7e21, 1.7e22, 1.6e23, 1.5e24, 1.5e25, 1.4e26, 1.3e27, 1.3e28, 1.2e29, 1.2e30, 1.1e31],
-    gsBase: 5, gsExp: 0.25, bonus: 0.01, petSlots: 1, maxPetSlots: 6,
+    gsBase: 5, gsExp: 0.25, bonus: 0.01,
+    // Emplacements de compagnons : un de plus à ces renaissances, de plus en plus espacées (5 au total à la 20e).
+    petSlotAt: [0, 1, 4, 10, 20], maxPetSlots: 5,
   };
   const threshold = p => {
     const T = PRESTIGE.thresholds, last = T.length - 1;
@@ -799,20 +801,57 @@
   // Les retirer les détruit (lost: true).
   const SEASON_FOODS = [
     { id: 'gl_bonbon_potiron', season: 'halloween', name: 'Bonbon au potiron', ingredients: [{ seed: 'potiron', n: 12 }, { seed: 'herbe_sorciere', n: 6 }],
-      any: { desc: 'Chasseur de l’ombre : il chasse chaque corbeau aussitôt, et chacun rapporte 3× plus.', malus: 'il ne sort que la nuit : nuits 20% plus longues', mods: pm => ({ crowHunter: { delay: 0.1, reward: 3 }, nightSpeed: pm.nightSpeed * 0.8 }) } },
+      any: { desc: 'Chasseur de l’ombre : il chasse chaque corbeau aussitôt, et chacun rapporte 3× plus.', malus: 'il ne sort que la nuit : nuits 20% plus longues', mods: pm => ({ crowHunter: { delay: 0.1, reward: 3 }, nightSpeed: pm.nightSpeed * 0.8 }) } ,
+      special: [
+        { pet: 'chat', desc: 'Chat de sorcière : il porte bonheur la nuit : +4% de légumes dorés et plus aucune récolte perdue.', malus: 'il fuit la lumière : fermier -10%', mods: pm => ({ golden: pm.golden + 0.04, nothing: 0, farmerSpeed: pm.farmerSpeed * 0.9 }) },
+        { pet: 'hibou', desc: 'Hibou des ténèbres : les nuits passent 2× plus vite et les plantes y poussent sans aucun malus.', malus: 'il dort tout le jour : plus de chasse aux corbeaux', mods: pm => ({ nightSpeed: pm.nightSpeed * 2, nightRelief: 1, crowHunter: null }) },
+        { pet: 'chien', desc: 'Chien-loup-garou : la nuit, il récolte 2× plus vite et 2 loups de plus l’accompagnent.', malus: 'la pleine lune l’épuise : le fermier dort plus longtemps (nuits 25% plus longues)', mods: pm => ({ petWorkerCount: pm.petWorkerCount + 2, petWorker: pm.petWorker && { ...pm.petWorker, act: pm.petWorker.act * 0.5 }, nightSpeed: pm.nightSpeed * 0.75 }) },
+        { pet: 'taupe', desc: 'Taupe des catacombes : toutes les 2 min, 3 plantes deviennent géantes sous terre.', malus: 'ses tunnels hantés effraient les robots : -15%', mods: pm => ({ robotSpeed: pm.robotSpeed * 0.85, powers: [...(pm.powers || []), { kind: 'giant', every: 120, n: 3 }] }) },
+      ] },
     { id: 'gl_pain_epices', season: 'noel', name: 'Pain d’épices', ingredients: [{ seed: 'sapin', n: 4 }, { seed: 'houx', n: 10 }],
-      any: { desc: 'Marché de Noël permanent : le marchand ambulant paie ×4 et passe toutes les 4 min.', malus: 'il traîne le froid avec lui : toutes les plantes -10% de croissance', mods: pm => ({ cartMult: pm.cartMult * 4, growthAll: pm.growthAll * 0.9, powers: [...(pm.powers || []), { kind: 'cart', every: 240 }] }) } },
+      any: { desc: 'Marché de Noël permanent : le marchand ambulant paie ×4 et passe toutes les 4 min.', malus: 'il traîne le froid avec lui : toutes les plantes -10% de croissance', mods: pm => ({ cartMult: pm.cartMult * 4, growthAll: pm.growthAll * 0.9, powers: [...(pm.powers || []), { kind: 'cart', every: 240 }] }) } ,
+      special: [
+        { pet: 'chien', desc: 'Renne du Père Noël : toutes les 3 min, il apporte un traîneau de cadeaux (3 plantes dorées).', malus: 'il tire le traîneau au lieu de travailler : fermier -15%', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 0.85, powers: [...(pm.powers || []), { kind: 'gold', every: 180, n: 3 }] }) },
+        { pet: 'renard', desc: 'Renard des neiges : il garde les silos, chasse tout, et le marchand paie ×3.', malus: 'il fait fondre la neige en courant : la terre sèche 30% plus vite', mods: pm => ({ guardSilo: true, chaseBoar: true, cartMult: pm.cartMult * 3, evapAll: pm.evapAll * 1.3 }) },
+        { pet: 'licorne', desc: 'Licorne de givre : son aura garde la terre humide et pousse 50% plus vite.', malus: 'son aura est glaciale : plus de valeur bonus dans l’aura (×1)', mods: pm => ({ aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 1.5, value: 1, evap: 0, wet: true } }) },
+        { pet: 'abeille', desc: 'Abeilles de pain d’épices : le miel rapporte 3× plus.', malus: 'engourdies par le froid : robots -10%', mods: pm => ({ honey: pm.honey && { ...pm.honey, secs: pm.honey.secs * 3 }, robotSpeed: pm.robotSpeed * 0.9 }) },
+      ] },
     { id: 'gl_cotillon', season: 'nouvel_an', name: 'Gâteau des rois', ingredients: [{ seed: 'champagne', n: 8 }, { seed: 'gui', n: 8 }],
-      any: { desc: 'Fête sans fin : marché en folie 2.5× plus fréquent.', malus: 'lendemain de fête : fermier -20%', mods: pm => ({ frenzyFreq: pm.frenzyFreq * 2.5, farmerSpeed: pm.farmerSpeed * 0.8 }) } },
+      any: { desc: 'Fête sans fin : marché en folie 2.5× plus fréquent.', malus: 'lendemain de fête : fermier -20%', mods: pm => ({ frenzyFreq: pm.frenzyFreq * 2.5, farmerSpeed: pm.farmerSpeed * 0.8 }) } ,
+      special: [
+        { pet: 'poussin', desc: 'Poussins de minuit : 3 poussins de plus et leur aura pousse 25% plus vite.', malus: 'ils font la fête : 4% des récoltes perdues', mods: pm => ({ chicks: pm.chicks + 3, aura: pm.aura && { ...pm.aura, mult: pm.aura.mult * 1.25 }, nothing: pm.nothing + 0.04 }) },
+        { pet: 'renard', desc: 'Renard du réveillon : le marché en folie revient toutes les 3 min.', malus: 'il ruine le marchand : le marchand ambulant ne vient plus', mods: pm => ({ noCart: true, powers: [...(pm.powers || []), { kind: 'frenzy', every: 180 }] }) },
+        { pet: 'dragon', desc: 'Dragon pyrotechnique : toutes les 2 min, un feu d’artifice étoile 2 plantes.', malus: 'les explosions attirent les orages : 2× plus d’orages', mods: pm => ({ stormMult: pm.stormMult * 2, powers: [...(pm.powers || []), { kind: 'star', every: 120, n: 2 }] }) },
+      ] },
     { id: 'gl_raviolis', season: 'nouvel_an_chinois', name: 'Raviolis porte-bonheur', ingredients: [{ seed: 'bambou', n: 20 }, { seed: 'pivoine', n: 3 }],
-      any: { desc: 'Porte-bonheur : +3% de légumes dorés.', malus: 'il offre des enveloppes rouges : tous les légumes -5%', mods: pm => ({ golden: pm.golden + 0.03, valueAll: pm.valueAll * 0.95 }) } },
+      any: { desc: 'Porte-bonheur : +3% de légumes dorés.', malus: 'il offre des enveloppes rouges : tous les légumes -5%', mods: pm => ({ golden: pm.golden + 0.03, valueAll: pm.valueAll * 0.95 }) } ,
+      special: [
+        { pet: 'dragon', desc: 'Dragon impérial : tous les légumes +35% et les orages l’évitent.', malus: 'il exige des offrandes : le marchand ambulant ne vient plus', mods: pm => ({ valueAll: pm.valueAll * 1.35, stormMult: Math.min(1, pm.stormMult), noCart: true }) },
+        { pet: 'chat', desc: 'Chat porte-bonheur doré : légumes dorés ×2.', malus: 'il ne fait que saluer : 5% des récoltes perdues', mods: pm => ({ goldenMult: pm.goldenMult * 2, nothing: pm.nothing + 0.05 }) },
+        { pet: 'poussin', desc: 'Coq du zodiaque : il crie toutes les 30 s, et toutes les plantes gagnent +40% de croissance.', malus: 'les robots se figent 2 s à chaque cri', mods: pm => ({ cry: { every: 30, boost: 0.4, freeze: 2 } }) },
+      ] },
     { id: 'gl_chocolat_coeur', season: 'saint_valentin', name: 'Chocolat en cœur', ingredients: [{ seed: 'rose_valentin', n: 4 }, { seed: 'fraise_coeur', n: 10 }],
-      any: { desc: 'Âme sœur : +12% de doubles récoltes.', malus: 'il ne quitte plus le fermier : il ne chasse plus rien, et robots -5%', mods: pm => ({ double: pm.double + 0.12, crowHunter: null, chaseBoar: false, robotSpeed: pm.robotSpeed * 0.95 }) } },
+      any: { desc: 'Âme sœur : +12% de doubles récoltes.', malus: 'il ne quitte plus le fermier : il ne chasse plus rien, et robots -5%', mods: pm => ({ double: pm.double + 0.12, crowHunter: null, chaseBoar: false, robotSpeed: pm.robotSpeed * 0.95 }) } ,
+      special: [
+        { pet: 'chat', desc: 'Chat câlin : +20% de doubles récoltes.', malus: 'il ne lâche plus le fermier : fermier -10%', mods: pm => ({ double: pm.double + 0.2, farmerSpeed: pm.farmerSpeed * 0.9 }) },
+        { pet: 'chien', desc: 'Chien fidèle : le fermier devient 50% plus rapide et ne dort plus.', malus: 'il en oublie les robots : robots -15%', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 1.5, farmerNoSleep: true, robotSpeed: pm.robotSpeed * 0.85 }) },
+        { pet: 'licorne', desc: 'Licorne de Cupidon : toutes les 60 s, 3 plantes de son aura mûrissent d’amour.', malus: 'elle rougit au soleil : aura 30% plus petite', mods: pm => ({ aura: pm.aura && { ...pm.aura, radius: pm.aura.radius * 0.7 }, powers: [...(pm.powers || []), { kind: 'ripen', every: 60, n: 3, aura: true }] }) },
+      ] },
     { id: 'gl_oeuf_choco', season: 'paques', name: 'Œuf en chocolat', ingredients: [{ seed: 'carotte_doree', n: 10 }, { seed: 'tulipe', n: 6 }],
-      any: { desc: 'Pondeur d’or : toutes les 3 min, 3 plantes deviennent dorées.', malus: 'indigestion : 3% des récoltes perdues', mods: pm => ({ nothing: pm.nothing + 0.03, powers: [...(pm.powers || []), { kind: 'gold', every: 180, n: 3 }] }) } },
+      any: { desc: 'Pondeur d’or : toutes les 3 min, 3 plantes deviennent dorées.', malus: 'indigestion : 3% des récoltes perdues', mods: pm => ({ nothing: pm.nothing + 0.03, powers: [...(pm.powers || []), { kind: 'gold', every: 180, n: 3 }] }) } ,
+      special: [
+        { pet: 'poussin', desc: 'Poule de Pâques : toutes les 90 s, une plante de son aura devient dorée, et 2 poussins de plus.', malus: 'elle couve : aura 20% moins efficace', mods: pm => ({ chicks: pm.chicks + 2, aura: pm.aura && { ...pm.aura, mult: 1 + (pm.aura.mult - 1) * 0.8 }, powers: [...(pm.powers || []), { kind: 'gold', every: 90, n: 1, aura: true }] }) },
+        { pet: 'renard', desc: 'Renard de Pâques : il cache des œufs : toutes les 2 min, 2 plantes deviennent dorées et étoilées.', malus: 'il les mange aussi : 4% des récoltes perdues', mods: pm => ({ nothing: pm.nothing + 0.04, powers: [...(pm.powers || []), { kind: 'gold', every: 120, n: 2 }, { kind: 'star', every: 240, n: 1 }] }) },
+        { pet: 'abeille', desc: 'Abeilles printanières : toutes les 45 s, 4 plantes mûrissent.', malus: 'elles piquent davantage : fermier -15%', mods: pm => ({ farmerSpeed: pm.farmerSpeed * 0.85, powers: [...(pm.powers || []), { kind: 'ripen', every: 45, n: 4 }] }) },
+      ] },
     { id: 'gl_smoothie', season: 'fete_musique', name: 'Smoothie de festival', ingredients: [{ seed: 'calebasse', n: 8 }, { seed: 'lavande', n: 10 }],
-      any: { desc: 'En rythme : toutes les plantes +15% de croissance.', malus: 'trop de bruit : 50% de corbeaux en plus', mods: pm => ({ growthAll: pm.growthAll * 1.15, crowMult: pm.crowMult * 1.5 }) } },
-  ].map(f => ({ ...f, units: 0, special: [], lost: true }));
+      any: { desc: 'En rythme : toutes les plantes +15% de croissance.', malus: 'trop de bruit : 50% de corbeaux en plus', mods: pm => ({ growthAll: pm.growthAll * 1.15, crowMult: pm.crowMult * 1.5 }) } ,
+      special: [
+        { pet: 'abeille', desc: 'Essaim musical : le bourdonnement fait pousser tout le champ (+30%).', malus: 'le bruit fait fuir le marchand ambulant', mods: pm => ({ growthAll: pm.growthAll * 1.3, noCart: true }) },
+        { pet: 'hibou', desc: 'Hibou DJ : nuits 40% plus courtes, et des touristes toutes les 3 min.', malus: 'il mixe au lieu de chasser : plus de chasse aux corbeaux', mods: pm => ({ nightSpeed: pm.nightSpeed * 1.4, crowHunter: null, powers: [...(pm.powers || []), { kind: 'event', every: 180, ev: 'touristes' }] }) },
+        { pet: 'chien', desc: 'Chien danseur : le chien de berger récolte 2× plus vite, en rythme.', malus: 'il aboie en cadence : robots -10%', mods: pm => ({ petWorker: pm.petWorker && { ...pm.petWorker, act: pm.petWorker.act * 0.5 }, farmerSpeed: pm.farmerSpeed * 1.1, robotSpeed: pm.robotSpeed * 0.9 }) },
+      ] },
+  ].map(f => ({ special: [], ...f, units: 0, lost: true })).map(f => { for (const x of f.special) x.bal = 'S'; return f; });
   PET_FOODS.push(...SEASON_FOODS);
 
   // Effet final d'une gamelle sur un compagnon (espèce + voie) : { desc, relief, malus, mods(pm), special }.
@@ -822,7 +861,8 @@
     const x = f.special.find(s => s.path && s.path === path) || f.special.find(s => s.pet === petId);
     if (!x) return { desc: f.any.desc, malus: f.any.malus || null, mods: f.any.mods, special: false, season: f.season || null };
     let extra = null, relief = null, malus = null;
-    if (x.bal === 'R') { const r = RELIEF[path] || RELIEF[petId]; relief = r.text; extra = r.mods; }
+    if (x.bal === 'S') malus = x.malus; // gamelle de saison : contrepartie propre, déjà codée dans l'effet
+    else if (x.bal === 'R') { const r = RELIEF[path] || RELIEF[petId]; relief = r.text; extra = r.mods; }
     else if (Array.isArray(x.bal)) { const d = DRAWBACK[x.bal[0]](x.bal[1]); malus = d.text; extra = d.mods; }
     return {
       desc: x.desc, relief, malus, special: true, bal: x.bal,
@@ -950,7 +990,7 @@
   const PERK_CATS = { depart: 'Départ', ouvriers: 'Ouvriers', familles: 'Familles de légumes', nature: 'Nature et événements', compagnons: 'Compagnons', commerce: 'Commerce' };
 
   // ---------- Compagnons ----------
-  // Emplacements : 1 + 1 par renaissance (max PRESTIGE.maxPetSlots). Le même animal peut occuper plusieurs emplacements.
+  // Emplacements : un de plus aux renaissances PRESTIGE.petSlotAt (1, 4, 10, 20). Le même animal peut occuper plusieurs emplacements.
   // À chaque renaissance, les compagnons reviennent au niveau 0 (on les garde, sans les racheter).
   // mods(L, evo) renvoie les modificateurs lus par core.js (voir PET_MOD_DEFAULTS) ; L('noeud') = niveau d'un nœud ou d'une maîtrise.
   // Plusieurs compagnons : multiplicateurs multipliés, ajouts additionnés, interrupteurs combinés (voir pets.js).
@@ -1424,7 +1464,7 @@
     ['lavande', 'Lavande d’été', 'fete_musique', 'fleur', 'flower', '#5a8a4a', '#9a7bff', { mult: 1.4, grow: 12, goldBonus: 0.05, desc: 'Rapide et parfumée.' }],
     ['potiron', 'Potiron hanté', 'halloween', 'fruit', 'ground', '#3a5a2a', '#ff7a1e', { mult: 3, grow: 40, night: true, desc: 'Pousse la nuit, et vaut 3× ta meilleure graine.' }],
     ['herbe_sorciere', 'Herbe de sorcière', 'halloween', 'champi', 'mandrake', '#5a2a7a', '#9fe870', { mult: 1.5, grow: 20, goldBonus: 0.2, desc: 'Ensorcelée : 20% de chances d’être dorée (et les champignons valent ×2).' }],
-    ['sapin', 'Sapin de Noël', 'noel', 'exotique', 'tree', '#1f6a3a', '#e0302a', { mult: 5, grow: 90, desc: 'Très lent, mais il vaut 5× ta meilleure graine.' }],
+    ['sapin', 'Sapin de Noël', 'noel', 'exotique', 'fir', '#1f6a3a', '#e0302a', { mult: 5, grow: 90, desc: 'Très lent, mais il vaut 5× ta meilleure graine.' }],
     ['houx', 'Houx', 'noel', 'baie', 'bush', '#2f7a3a', '#e0302a', { mult: 1.5, grow: 12, desc: 'Rapide et décoratif.' }],
   ];
   const SEASON_SEEDS = SEASON_SEED_LIST.map(([id, name, season, fam, shape, leaf, fruit, o]) => ({
