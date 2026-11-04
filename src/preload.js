@@ -1,0 +1,21 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('api', {
+  setIgnore: ignore => ipcRenderer.send('set-ignore', ignore),
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  setSetting: (key, value) => ipcRenderer.invoke('set-setting', key, value),
+  onSettings: cb => ipcRenderer.on('settings', (_e, s) => cb(s)),
+  onOpenTab: cb => ipcRenderer.on('open-tab', (_e, tab) => cb(tab)),
+  loadSave: () => ipcRenderer.sendSync('save-load'),
+  writeSave: txt => ipcRenderer.send('save-write', txt),
+  writeSaveSync: txt => ipcRenderer.sendSync('save-write-sync', txt),
+  onFlushSave: cb => ipcRenderer.on('flush-save', () => cb()),
+  onSaveConflict: cb => ipcRenderer.on('save-conflict', (_e, info) => cb(info)),
+  resolveConflict: (choice, txt) => ipcRenderer.send('save-resolve', choice, txt),
+  chooseSaveDir: () => ipcRenderer.invoke('choose-save-dir'),
+  defaultSaveDir: () => ipcRenderer.invoke('default-save-dir'),
+  setSaveDir: (dir, mode, txt) => ipcRenderer.sendSync('set-save-dir', dir, mode, txt),
+  openSaveDir: () => ipcRenderer.send('open-save-dir'),
+  hide: () => ipcRenderer.send('hide'),
+  quit: () => ipcRenderer.send('quit'),
+});

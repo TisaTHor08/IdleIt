@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+  <title>IdleIt Ferme</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="toasts"></div>
+  <div id="conflict" class="hidden">
+    <div>La sauvegarde a été modifiée sur un autre appareil pendant que tu jouais ici. Ta partie en cours a été mise de côté (<span id="conflict-file"></span>).</div>
+    <div class="btns"><button class="buy gold" id="conflict-theirs">Charger l'autre version</button><button class="buy" id="conflict-mine">Garder ma partie</button></div>
+  </div>
+  <div id="tooltip" class="hidden"></div>
+  <div id="panel" class="hidden">
+    <div class="panel-head">
+      <div id="tabs"></div>
+      <div id="mult"></div>
+      <button id="panel-close" class="x" data-tip="Fermer">✕</button>
+    </div>
+    <div id="panel-body"></div>
+  </div>
+  <!-- Tiroir vertical ouvert par la flèche du HUD : onglets du menu + graines du pinceau -->
+  <div id="drawer" class="hidden">
+    <div id="menu"></div>
+    <div id="seedbar"></div>
+  </div>
+  <div id="band">
+    <canvas id="scene"></canvas>
+    <div id="hud">
+      <div class="money"><span id="money">0 $</span><span id="rate">0 $/s</span></div>
+      <div id="env"></div>
+      <button id="drawer-toggle" class="ib" data-tip="Menu"><img alt=""></button>
+    </div>
+  </div>
+  <script src="js/data.js"></script>
+  <script src="js/pets.js"></script>
+  <script src="js/market.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

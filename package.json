@@ -1,0 +1,46 @@
+{
+  "name": "idleit",
+  "productName": "IdleIt Ferme",
+  "version": "0.11.0",
+  "description": "Idle game de ferme miniature qui vit au-dessus de la barre des tâches.",
+  "main": "src/main.js",
+  "author": "IdleIt",
+  "license": "MIT",
+  "scripts": {
+    "start": "node tools/start.js",
+    "debug": "node tools/start.js --farm-debug",
+    "sim": "node tools/sim.js",
+    "icon": "node tools/make-icon.js",
+    "build": "electron-builder --win portable nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.idleit.ferme",
+    "productName": "IdleIt Ferme",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "IdleIt-Ferme-portable-${version}.exe"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}
