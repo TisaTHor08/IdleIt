@@ -1,18 +1,18 @@
-# Wiki de Farmling. Depuis la racine du dépôt :
+# Site et wiki de Farmling, mis à jour automatiquement depuis GitHub.
+#   git clone https://github.com/TisaTHor08/IdleIt.git && cd IdleIt
 #   docker compose -f wiki/docker-compose.yml up -d --build
-# puis http://localhost:8080. Pour une URL publique (sitemap, liens canoniques) : SITE_URL=https://... dans .env ou l'environnement.
+# puis http://<nas>:8080. Le conteneur « updater » vérifie le dépôt toutes les 2 min et régénère le site
+# dès que le dossier wiki/ (ou les données du jeu, le générateur, l'éditeur, la version) change.
+# Réglages (fichier .env à côté, ou variables d'environnement) : WIKI_PORT, SITE_URL, BRANCH, INTERVAL.
 services:
-  wiki:
-    build:
-      context: ..
-      dockerfile: wiki/Dockerfile
-      args:
-        SITE_URL: ${SITE_URL:-}
-    image: farmling-wiki:latest
-    container_name: farmling-wiki
+  site:
+    image: nginx:1.27-alpine
+    container_name: farmling-site
     ports:
       - "${WIKI_PORT:-8080}:80"
-    restart: unless-stopped
+    volumes:
+      - site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     read_only: true
     tmpfs:
       - /var/cache/nginx
@@ -20,3 +20,28 @@ services:
       - /tmp
     security_opt:
       - no-new-privileges:true
+    restart: unless-stopped
+    depends_on:
+      - updater
+
+  updater:
+    build:
+      context: ..
+      dockerfile: wiki/updater.Dockerfile
+    image: farmling-site-updater:latest
+    container_name: farmling-site-updater
+    environment:
+      REPO_URL: ${REPO_URL:-https://github.com/TisaTHor08/IdleIt.git}
+      BRANCH: ${BRANCH:-main}
+      INTERVAL: ${INTERVAL:-120}
+      SITE_URL: ${SITE_URL:-}
+    volumes:
+      - repo:/repo
+      - site:/site
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  repo:
+  site:

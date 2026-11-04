@@ -7,3 +7,4 @@
 !tools/wiki/build.js
 !wiki/assets/**
 !wiki/nginx.conf
+!wiki/updater.sh

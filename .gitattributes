@@ -3,3 +3,5 @@ wiki/Dockerfile text eol=lf
 wiki/nginx.conf text eol=lf
 wiki/docker-compose.yml text eol=lf
 .dockerignore text eol=lf
+wiki/updater.sh text eol=lf
+wiki/updater.Dockerfile text eol=lf
