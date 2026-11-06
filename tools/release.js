@@ -14,7 +14,8 @@ const { version } = require(path.join(ROOT, 'package.json'));
 const notes = process.argv[2];
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE; // sinon Electron démarrerait comme Node pendant la construction
-const run = (cmd, args) => execFileSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32', env });
+// npx a besoin d'un shell sous Windows (npx.cmd) ; gh est un vrai exe : sans shell, les arguments avec espaces restent entiers.
+const run = (cmd, args, shell = process.platform === 'win32') => execFileSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell, env });
 
 fs.rmSync(DIST, { recursive: true, force: true });
 run('npx', ['electron-builder', '--win', 'portable', 'nsis', '--publish', 'never']);
@@ -24,5 +25,5 @@ fs.copyFileSync(path.join(DIST, setup), path.join(DIST, 'Farmling-Setup.exe'));
 fs.copyFileSync(path.join(DIST, portable), path.join(DIST, 'Farmling-portable.exe'));
 const files = [setup, `${setup}.blockmap`, portable, 'latest.yml', 'Farmling-Setup.exe', 'Farmling-portable.exe'].map(f => path.join('dist', f));
 run('gh', ['release', 'create', 'v' + version, ...files, '--repo', 'TisaTHor08/IdleIt', '--target', 'main', '--title', `Farmling ${version}`,
-  ...(notes ? ['--notes-file', notes] : ['--generate-notes'])]);
+  ...(notes ? ['--notes-file', notes] : ['--generate-notes'])], false);
 console.log('Version publiée : v' + version);
