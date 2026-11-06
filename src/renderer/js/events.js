@@ -278,7 +278,7 @@
         if (ev.touristCd > 0) return;
         ev.touristCd = 1;
         const ripe = [];
-        for (let i = 0; i < this.activePlots(); i++) { const c = this.s.plots[i].crop; if (c && c.p >= 1 && !this.claims[i] && c.mutant !== 'infini') ripe.push(i); }
+        for (let i = 0; i < this.activePlots(); i++) { const c = this.s.plots[i].crop; if (c && c.p >= 1 && !this.claims[i] && !this.infiniWaits(c)) ripe.push(i); }
         if (!ripe.length) return;
         const i = ripe[Math.floor(Math.random() * ripe.length)];
         this.harvest(i, 'tourist', X.touristMult);

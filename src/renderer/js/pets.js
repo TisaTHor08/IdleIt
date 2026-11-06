@@ -406,7 +406,7 @@
             const R = pw.radius || 30;
             for (let i = 0; i < n; i++) {
               const c = crop(i);
-              if (!c || c.p < 1 || c.mutant === 'infini' || c.caught) continue;
+              if (!c || c.p < 1 || this.infiniWaits(c) || c.caught) continue;
               if (pw.fam && SEED_BY_ID[c.id].fam !== pw.fam) continue;
               if (!pw.all && main && Math.abs(plotX(i) - main.x) > R) continue;
               this.harvest(i, 'pet');

@@ -46,6 +46,7 @@
         const units = Math.max(1, Math.round((this.science() ? this.ogmYield() : 1) * plants));
         const worth = v / units;
         this.s.trade.made[seed.id] = (this.s.trade.made[seed.id] || 0) + units;
+        this.inflowAcc = (this.inflowAcc || 0) + units;
         const put = Math.max(0, Math.min(units, Math.floor(this.siloCapacity() - this.stockUnits())));
         if (put > 0) {
           const key = seed.id + '|' + traits.join(',');
@@ -99,7 +100,7 @@
       // Rentabilité (valeur par seconde et par parcelle) d'une graine, pour les commandes et le gestionnaire.
       seedRate(sd) {
         const g = sd.grow < D.FAST_GROW ? this.pm.fastGrowth : this.pm.slowGrowth;
-        return sd.value * this.fxValue(sd) * this.harvestMult(sd, 'robot') * g * this.fxMul('growth', { fam: sd.fam, seed: sd.id }) / sd.grow;
+        return sd.value * this.fxValue(sd) * this.harvestMult(sd, 'robot') / this.seedGrowTime(sd, g * this.fxMul('growth', { fam: sd.fam, seed: sd.id }));
       },
       bestSeedRate() { let top = 0; for (const sd of D.SEEDS) if (this.s.seeds[sd.id]) top = Math.max(top, this.seedRate(sd)); return top; },
       demandCap() { return M.demandMax + this.fxAdd('demand'); },
@@ -200,6 +201,10 @@
           }
         }
         if (!this.marketOn()) return;
+        // Flux entrant (unités/s) vers les silos, lissé sur ~1 min : sert à la vision du trader.
+        const a = 1 - Math.exp(-dt / M.inflowMemory);
+        this.inflow = (this.inflow || 0) + ((this.inflowAcc || 0) / Math.max(dt, 1e-6) - (this.inflow || 0)) * a;
+        this.inflowAcc = 0;
         this.updateFreshness(dt);
         // Chocs : pénuries et krachs.
         for (const k of tr.shocks) k.t -= dt;
@@ -252,6 +257,34 @@
           else if (f > bestF) { bestF = f; best = key; }
         }
         if (best && st[best] && bestF >= floor && this.stockUnits() >= this.siloCapacity() * M.traderFull) this.sellStock(best, lot, comm);
+        if (this.lvl('trader_vision')) this.traderVision(lot, comm, floor);
+      },
+
+      // Vision du stock : prix demandé qui glisse vers le plancher à mesure que les silos se remplissent,
+      // puis ventes anticipées (meilleurs lots d'abord) pour garder la place des récoltes qui arrivent.
+      traderTarget(fill, floor) {
+        const k = Math.max(0, Math.min(1, (fill - M.visionFrom) / (1 - M.visionFrom)));
+        return M.traderTarget + (floor - M.traderTarget) * k;
+      },
+      traderRoom() {
+        const cap = this.siloCapacity();
+        const ahead = M.visionAhead[Math.min(M.visionAhead.length, this.lvl('trader_vision')) - 1];
+        return Math.max(0, Math.min(cap * M.visionKeep, cap - (this.inflow || 0) * ahead));
+      },
+      traderVision(lot, comm, floor) {
+        const st = this.s.trade.stock;
+        const cap = Math.max(1, this.siloCapacity());
+        const target = this.traderTarget(this.stockUnits() / cap, floor);
+        const lots = Object.keys(st).map(key => ({ key, f: this.priceFactor(st[key], Math.ceil(st[key].units * lot)) * st[key].fresh }))
+          .filter(x => x.f >= floor).sort((a, b) => b.f - a.f);
+        for (const x of lots) {
+          const e = st[x.key];
+          if (!e) continue;
+          const over = this.stockUnits() - this.traderRoom();
+          if (x.f >= target) this.sellStock(x.key, lot, comm);
+          else if (over > 0) this.sellStock(x.key, Math.min(1, Math.max(lot, over / e.units)), comm);
+          else break;
+        }
       },
 
       // Le gestionnaire choisit les deux graines les plus rentables au cours actuel (60 % / 40 %, sous le seuil d'épidémie).

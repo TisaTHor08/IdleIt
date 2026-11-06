@@ -5,14 +5,14 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 
 ![La ferme au-dessus de la barre des tâches](docs/img/band.png)
 
-- 44 légumes répartis en 10 familles et 17 ères, 16 robots, 69 améliorations, 28 talents de spécialisation
+- 44 légumes répartis en 10 familles et 17 ères, 13 rangs de robots à améliorer + 8 spécialistes, 70 améliorations, 28 talents de spécialisation
 - 9 compagnons (dont 4 légendaires) avec arbre de talents, évolution, 3 voies chacun et une maîtrise ; jusqu'à 5 emplacements
 - Un marché vivant : silos, cours, pénuries, krachs, commandes, produits qui s'abîment
 - Météo (8 temps), orages et éclairs, 13 événements aléatoires, 8 mutations, cultures denses
 - Une **usine de transformation** (fin de partie) : 6 machines, 17 recettes, tapis, robots, frigos, trader et gestionnaire
 - **16 gamelles** pour les compagnons et **180 effets spéciaux** (chaque compagnon, dans chaque état, en a un pour chaque gamelle)
 - Ultra sobre : environ **2 % d'un cœur** et 250 Mo, rendu en 5 à 15 images/s au choix
-- 32 talents de renaissance, 85 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
+- 32 talents de renaissance, 86 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
 - Sauvegarde 100 % automatique, compatible avec un dossier synchronisé (NAS, cloud)
 
 ---
@@ -56,19 +56,21 @@ Le pinceau sert à choisir quoi planter : sélectionne une graine puis clique su
 
 Chaque légume rapporte plus que le précédent, mais pousse plus lentement et coûte bien plus cher à débloquer. Les légumes sont classés en **familles** (racines, céréales, feuilles, fruits, légumineuses, baies, fleurs, champignons, exotiques, mythiques). Chaque famille a ses outils (grelinette, fléau, serpette, cueilleur…), ses améliorations de culture (buttes, sillons, voiles, tuteurs…) et sa durée de conservation au silo.
 
+Les légumes de haut niveau prennent leur temps : en plus d'une pousse bien plus longue, ils ont une **durée incompressible** de pousse et de récolte, qui grandit avec leur rang. Les bonus de croissance et de vitesse raccourcissent le reste, mais jamais en dessous de ce plancher : même avec tout au maximum et les meilleurs compagnons, l'Arbre-monde met 2 min à pousser et 20 s à se récolter.
+
 Au départ, seuls 7 légumes du potager (radis → haricot vert) existent. Chaque **renaissance** ouvre une nouvelle ère avec 1 à 3 légumes : chou, oignon et maïs, aubergine, citrouille et fraise, brocoli, champignons… jusqu'aux légumes mythiques (chou cosmique, haricot magique, fruit astral) et, tout au bout, l'**Arbre-monde** (20 renaissances).
 
 ### Champ, outils et robots
 
 - **Champ** : achète des parcelles, l'irrigation, des paratonnerres, et fusionne tes parcelles en **cultures denses** (serrée ×3 plants, intensive ×9, quantique ×27). Une culture dense rapporte plus sur une seule place, mais planter, récolter et arroser y prennent d'autant plus de temps, et les légumes dorés y sont plus rares.
 - **Outils** : vitesse du fermier, valeur des récoltes par famille, croissance, chance de légume doré…
-- **Robots** : du robot rouillé à l'intelligence centrale (16 modèles, dont certains spécialisés : arroseur, semeur, moissonneuse, soigneur, paratonnerre, épouvantail). Ils vont plus vite que le fermier mais ont une **batterie** et retournent se recharger à la grange (bornes, panneaux solaires, charge rapide…). Les modèles avancés se débloquent au fil des renaissances. Une fois assez nombreux, un modèle peut être **miniaturisé** (plus discret).
+- **Robots** : on n'achète que des **robots rouillés**, puis on les **améliore un par un** (chaque transformation se paie) : chromé, laser, drone, tracteur, androïde quantique, golem, nano-essaim… jusqu'à l'esprit de l'Arbre-monde, 13 rangs au total, dont les derniers se débloquent au fil des renaissances (jusqu'à la 20e). Ils partagent un plafond de 80 robots (+8 par niveau du talent Usine). À côté, 8 **spécialistes** s'achètent à part : arroseur, semeur, moissonneuse, soigneur, paratonnerre, épouvantail, abeille mécanique, intelligence centrale. Les robots vont plus vite que le fermier mais ont une **batterie** et retournent se recharger à la grange (bornes, panneaux solaires, charge rapide…) ; à partir du golem, plus besoin de recharger. Une fois assez nombreux, un modèle peut être **miniaturisé** (plus discret).
 
 ![Robots](docs/img/robots.png)
 
 ### Spécialisation
 
-Trois branches (Mécanique, Botanique, Paysannerie) et deux doctrines exclusives, **Bio** ou **Science**. Chaque niveau acheté dans une branche rend les autres plus chères : il faut choisir un style de ferme. La Science active les **OGM** et les **mutations** tirées à la plantation : géante (plus grosse, vaut beaucoup plus, plus longue à récolter), infinie (grandit tant que tu ne la cueilles pas), carnivore, stérile, fébrile, lente, solide, moisie.
+Trois branches (Mécanique, Botanique, Paysannerie) et deux doctrines exclusives, **Bio** ou **Science**. Chaque niveau acheté dans une branche rend les autres plus chères : il faut choisir un style de ferme. La Science active les **OGM** et les **mutations** tirées à la plantation : géante (plus grosse, vaut beaucoup plus, plus longue à récolter), infinie (grandit tant que tu ne la cueilles pas ; les ouvriers la récoltent à partir de ×300), carnivore, stérile, fébrile, lente, solide, moisie.
 
 ![Spécialisation](docs/img/spec.png)
 
@@ -94,6 +96,8 @@ Dès 10 M$ gagnés dans une partie, le marché ouvre. Les récoltes partent dans
 
 - Les **cours** bougent sans cesse, plus fort sur les légumes bon marché. Des **pénuries** (cours ×6 à ×25) et des **krachs** frappent au hasard.
 - Les **commandes** (bio, sans OGM, résistant au froid…) paient à parité avec ton meilleur légume : de quoi rendre le blé ou les carottes rentables en fin de partie. Le prix reste plafonné à 3× la rentabilité de ton meilleur légume.
+- Les légumes **géants** et **infinis** remplissent plus les silos : une géante donne 8 unités, une infinie autant d'unités que son multiplicateur.
+- Le trader peut apprendre la **vision du stock** : plus les silos se remplissent, moins il est exigeant sur le prix, et il vend à l'avance pour garder la place des récoltes qui arrivent.
 - Les **légumes dorés** sont un produit à part, avec leur propre cours (plus nerveux), et certaines recettes de l'usine en demandent.
 - Les produits **s'abîment** : la salade et les champignons pourrissent vite, le blé et les pommes de terre se gardent des heures. Chambre froide et conserverie ralentissent l'usure, et un voleur peut s'en prendre à tes silos.
 
@@ -163,7 +167,7 @@ Avec le gestionnaire d'usine, tu peux **viser** une gamelle : il fait pousser le
 
 Sept fêtes changent la ferme pendant 3 semaines (10 jours avant et après la date, selon l'horloge de l'ordinateur) : **nouvel an**, **nouvel an chinois**, **Saint-Valentin**, **Pâques**, **fête de la musique**, **Halloween** et **Noël**. Quand deux fêtes se chevauchent, la plus proche l'emporte.
 
-- **2 plantes de saison**, plantables gratuitement pendant la fête (potiron hanté, sapin de Noël, pivoine impériale, rose de Saint-Valentin…). Leur valeur suit ta meilleure graine.
+- **2 plantes de saison** à acheter à chaque nouvelle saison (potiron hanté, sapin de Noël, pivoine impériale, rose de Saint-Valentin…). Leur prix est fixé au début de la fête d'après ta progression (la valeur de ta meilleure graine), et elles restent débloquées jusqu'à la fin de la saison, même après une renaissance. Leur valeur suit ta meilleure graine.
 - **Un événement** : nuit des sorcières, traîneau du Père Noël, feu d'artifice, danse du dragon, Cupidon, chasse aux œufs, concert au champ.
 - **Des bonus qui changent la meilleure stratégie** : nuits plus longues mais plus fertiles, une famille de légumes qui vaut 2× plus, une récolte sur 8 ×8, gel 4× plus fréquent, soldes de janvier…
 - **Une gamelle de saison**, cuisinée avec les deux légumes exclusifs (panier de saison). Elle se garde ensuite pour toujours, avec un effet très précis utile toute l'année et une contrepartie précise. La retirer la détruit.
@@ -191,7 +195,7 @@ Les graines d'or sont rares : aller bien au-delà du seuil en rapporte un peu pl
 
 ### Succès et réglages
 
-85 succès, chacun +2 % de revenus. Dans les **réglages** : écran, taille, opacité, **animation** (15, 10 ou 5 images/s : moins d'images = moins de processeur, le jeu avance pareil), lancement au démarrage de Windows, raccourci clavier, dossier de sauvegarde.
+86 succès, chacun +2 % de revenus. Dans les **réglages** : écran, taille, opacité, **animation** (60, 30, 15, 10 ou 5 images/s : moins d'images = moins de processeur, le jeu avance pareil), lancement au démarrage de Windows, raccourci clavier, dossier de sauvegarde.
 
 Le jeu est conçu pour tourner toute la journée : simulation à 5 Hz, décor redessiné 4 fois par seconde, sprites mis en cache, canvas limité à la partie dessinée, rendu en pause quand la ferme est masquée, pas d'accélération GPU. Mesuré : environ 2 % d'un cœur et 250 Mo.
 

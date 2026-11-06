@@ -106,6 +106,11 @@
     abeille_meca: { H: '#f2b84b', B: '#2b2b2b', n: '#5e6b7a', e: '#7fe3ff', a: '#e6f4ff', d: '#f2b84b', m: '#2b2b2b', w: '#5e6b7a', W: '#9aa3ad' },
     paratonnerre: { H: '#f2c94c', B: '#2b2b2b', n: '#5e6b7a', e: '#7fe3ff', a: '#e8e8e8', d: '#f2c94c', m: '#121212', w: '#222', W: '#666' },
     soigneur: { H: '#f4f1ea', B: '#d8d2c6', n: '#7a7468', e: '#3a8fe0', a: '#e0302a', d: '#e0302a', m: '#4a463e', w: '#222', W: '#666' },
+    plasma: { H: '#ff8a3c', B: '#d9541e', n: '#5a1e08', e: '#fff3a0', a: '#7fe3ff', d: '#ffc27a', m: '#2a0c04', w: '#1d1d1d', W: '#ff8a3c' },
+    chrono: { H: '#d9c27a', B: '#a8863a', n: '#4a3a14', e: '#7fe3ff', a: '#ffffff', d: '#f2e0a0', m: '#2b1d08', w: '#2b1d08', W: '#d9c27a' },
+    titan: { H: '#3a3a66', B: '#1f1f44', n: '#0b0b1a', e: '#ffe14d', a: '#ffd84a', d: '#6a6aa8', m: '#0b0b1a', w: '#0b0b1a', W: '#ffe14d' },
+    astral: { H: '#c7a6ff', B: '#6a3fc4', n: '#2e1f66', e: '#ffffff', a: '#ffe14d', d: '#e6dcff', m: '#1b1040', w: '#1b1040', W: '#c7a6ff' },
+    sylve: { H: '#5fd14f', B: '#2f8f3a', n: '#1d3a14', e: '#ffd84a', a: '#ff7ab0', d: '#a6e88a', m: '#1d3a14', w: '#6b4426', W: '#8a6a43' },
   };
   const DRONE_MAP = [
     '..n.....n..',
@@ -686,12 +691,23 @@
       px(ctx, x - 6 + (spin ? 0 : 1), y - 5, 3, 1, '#c8d2dc');
       px(ctx, x + 3 + (spin ? 1 : 0), y - 5, 3, 1, '#c8d2dc');
       if (acting) { px(ctx, x, y + 1, 1, 1, '#b9ffcf'); px(ctx, x, y + 3 + bob, 1, 1, '#7fe3ff'); }
+      drawUpgradeFx(ctx, w, x, ground - 8, t);
       return;
     }
     const pal = ROBOT_PAL[w.kind] || ROBOT_PAL.rouille;
     if (w.kind === 'quantique') ctx.globalAlpha = 0.75 + 0.25 * Math.sin(t * 9 + w.id);
+    // Gardien astral : il plane, sans roues, et laisse une traînée d'étoiles.
+    if (w.kind === 'astral') {
+      const y = ground - 4 + Math.round(Math.sin(w.anim * 2.5 + w.id));
+      drawMap(ctx, ROBOT_MAP, pal, left, y + bob, flip);
+      if (moving && Math.floor(t * 6 + w.id) % 2) px(ctx, x - w.dir * 6, y - 1 - (w.id % 3), 1, 1, '#ffe14d');
+      if (acting) drawTool(ctx, w, x, ground, flip);
+      drawUpgradeFx(ctx, w, x, ground, t);
+      return;
+    }
     drawMap(ctx, ROBOT_MAP, pal, left, ground - 1 + bob, flip);
     drawMap(ctx, WHEELS[frame], pal, left, ground, flip);
+    robotTrim(ctx, w, x, ground - 1 + bob, t, flip);
     if (w.kind === 'quantique' && moving) {
       ctx.globalAlpha = 0.25;
       drawMap(ctx, ROBOT_MAP, pal, left - w.dir * 3, ground - 1, flip);
@@ -701,6 +717,24 @@
       const fx = flip ? left - 1 : left + 8;
       px(ctx, fx, ground - 4, 1, 3, Math.floor(w.anim * 12) % 2 ? '#ff3b3b' : '#ffd0d0');
     } else if (acting) drawTool(ctx, w, x, ground, flip);
+    drawUpgradeFx(ctx, w, x, ground, t);
+  }
+
+  // Détails des robots des dernières ères (au-dessus de la tête, base = haut du corps).
+  function robotTrim(ctx, w, x, base, t, flip) {
+    const top = base - ROBOT_MAP.length;
+    if (w.kind === 'plasma') px(ctx, x, top - 1, 1, 1, Math.floor(t * 10 + w.id) % 2 ? '#7fe3ff' : '#ffffff');
+    else if (w.kind === 'chrono') { const k = Math.floor(t * 2 + w.id) % 4; px(ctx, x + [0, 1, 0, -1][k], top - 1 + [0, 1, 1, 1][k] - 1, 1, 1, '#ffffff'); }
+    else if (w.kind === 'titan') { if (Math.floor(t * 3 + w.id) % 3 === 0) px(ctx, x + (flip ? 2 : -3), top, 1, 1, '#ffe14d'); }
+    else if (w.kind === 'sylve') { px(ctx, x - 1, top - 1, 1, 1, '#5fd14f'); px(ctx, x, top - 2, 1, 2, '#2f8f3a'); px(ctx, x + 1, top - 1, 1, 1, '#ff7ab0'); }
+  }
+  // Étincelles quand un robot vient d'être transformé au rang supérieur.
+  function drawUpgradeFx(ctx, w, x, ground, t) {
+    if (!(w.upT > 0)) return;
+    for (let k = 0; k < 5; k++) {
+      const a = t * 6 + k * 1.26, r = 3 + (1.2 - w.upT) * 5;
+      px(ctx, x + Math.round(Math.cos(a) * r), ground - 6 + Math.round(Math.sin(a) * r * 0.6), 1, 1, k % 2 ? '#ffe14d' : '#ffffff');
+    }
   }
 
   function drawTool(ctx, w, x, ground, flip) {

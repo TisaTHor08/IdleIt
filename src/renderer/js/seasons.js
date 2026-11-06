@@ -24,6 +24,7 @@
           info = def ? { id: def.id, def, end: new Date(Date.now() + 7 * 864e5) } : null;
         } else info = D.seasonAt(new Date());
         const id = info ? info.id : null;
+        this.syncSeasonShop(info);
         if (id === this.seasonId) return;
         const prev = this.seasonId;
         this.seasonId = id;
@@ -36,9 +37,25 @@
         else if (prev) this.emit('season-end', { id: prev });
       },
       seasonDef() { return this.seasonInfo ? this.seasonInfo.def : null; },
+      // Nouvelle saison (ou même fête une autre année) : les achats repartent de zéro et le prix est figé d'après
+      // la progression du moment (meilleure graine × multiplicateur de valeur).
+      syncSeasonShop(info) {
+        const shop = this.s.seasonShop || (this.s.seasonShop = { key: null, base: 0, bought: {} });
+        if (!shop.bought) shop.bought = {};
+        const key = info ? info.id + '|' + (info.start ? new Date(info.start).toDateString() : '') : null;
+        if (key === shop.key) return;
+        shop.key = key;
+        shop.bought = {};
+        shop.base = key ? SEED_BY_ID[this.bestSeed()].value * this.valueMult() : 0;
+      },
+      seasonSeedBought(id) { return !!(this.s.seasonShop && this.s.seasonShop.bought[id]); },
+      seasonSeedCost(id) {
+        const sd = SEED_BY_ID[id];
+        return Math.max(50, (this.s.seasonShop.base || 0) * D.SEASON_PRICE.harvests * (sd ? sd.mult || 1 : 1)) * this.discount();
+      },
       seasonSeeds() { return this.seasonId ? D.SEASON_SEEDS.filter(sd => sd.season === this.seasonId) : []; },
-      // Une graine de saison se plante tant que sa saison dure (sans être achetée).
-      seasonSeedOk(id) { const sd = SEED_BY_ID[id]; return !!sd && !!sd.season && sd.season === this.seasonId; },
+      // Une graine de saison se plante tant que sa saison dure, une fois achetée pour cette saison.
+      seasonSeedOk(id) { const sd = SEED_BY_ID[id]; return !!sd && !!sd.season && sd.season === this.seasonId && this.seasonSeedBought(id); },
       seedValue(sd) { return sd.season ? SEED_BY_ID[this.bestSeed()].value * sd.mult : sd.value; },
       seasonDiscount() { const d = this.seasonDef(); return d && d.discount ? d.discount : 1; },
       // Mods de saison appliqués aux modificateurs combinés des compagnons.

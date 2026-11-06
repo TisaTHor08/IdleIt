@@ -47,6 +47,7 @@
       pets: { list: [], seen: {}, nextUid: 1 },
       pantry: {},                                  // gamelles des compagnons (gardées à la renaissance)
       basket: {},                                  // légumes de saison récoltés (gamelles de saison)
+      seasonShop: { key: null, base: 0, bought: {} }, // graines de saison achetées pour la saison en cours (prix figé à son début)
       factory: defaultFactory(),                   // usine : remise à zéro à la renaissance     // compagnons : gardés à la renaissance, mais remis au niveau 0
       market: { unlocked: false },                 // conservé à la renaissance
       trade: defaultTrade(),                       // silos, stock et cours : remis à zéro à la renaissance
@@ -267,7 +268,14 @@
     tal(id) { return this.s.tal[id] || 0; }
     prestiges() { return this.s.stats.prestiges || 0; }
     branchLevels(b) { return D.TALENTS.reduce((a, t) => a + (t.branch === b ? this.tal(t.id) : 0), 0); }
-    robotMax(id) { return ROBOT_BY_ID[id].max + (ROBOT_BY_ID[id].only === 'none' ? 0 : 2 * this.tal('usine')); }
+    robotMax(id) {
+      if (ROBOT_BY_ID[id].chain != null) return this.chainMax();
+      return ROBOT_BY_ID[id].max + (ROBOT_BY_ID[id].only === 'none' ? 0 : 2 * this.tal('usine'));
+    }
+    // Robots polyvalents : un plafond commun à tous les rangs de la chaîne (rouillé, chromé, laser...).
+    chainMax() { return D.CHAIN_CAP.max + D.CHAIN_CAP.perUsine * this.tal('usine'); }
+    chainCount() { return D.ROBOT_CHAIN.reduce((a, r) => a + (this.s.robots[r.id] || 0), 0); }
+    chainNext(id) { const r = ROBOT_BY_ID[id]; return r && r.chain != null ? D.ROBOT_CHAIN[r.chain + 1] || null : null; }
     bio() { return this.tal('certif') > 0; }
     science() { return this.tal('labo') > 0; }
     branchLocked(branch) {
@@ -381,8 +389,16 @@
       }
       r *= this.pm.growthAll * D.DENSE[pl.tier || 0].growth;
       if (pl.crop.mutant && D.MUTATIONS[pl.crop.mutant].growth) r *= D.MUTATIONS[pl.crop.mutant].growth;
-      return r;
+      return this.slowRate(seed, r * seed.grow);
     }
+    // Légumes de haut niveau : une part de la pousse est incompressible (seed.minGrow), les bonus n'agissent que sur le reste.
+    // m = multiplicateur total de croissance ; renvoie la vitesse (fraction de pousse par seconde).
+    slowRate(seed, m) {
+      if (!seed.minGrow) return m / seed.grow;
+      return m > 0 ? 1 / (seed.minGrow + (seed.grow - seed.minGrow) / m) : 0;
+    }
+    // Temps de pousse d'une graine avec un multiplicateur de croissance m (pour l'affichage et les estimations).
+    seedGrowTime(seed, m = this.growthMult()) { const r = this.slowRate(seed, m); return r > 0 ? 1 / r : Infinity; }
     incomeRate() { return this.incomeBuckets.reduce((a, b) => a + b, 0) / this.incomeBuckets.length; }
     harvestRate() { return this.harvestBuckets.reduce((a, b) => a + b, 0) / this.harvestBuckets.length; }
 
@@ -390,7 +406,9 @@
     discount() { return Math.pow(0.95, this.perk('rabais')) * this.seasonDiscount(); }
     upCost(id, level = this.lvl(id)) { const u = UP_BY_ID[id]; return u.base * Math.pow(u.g, level) * this.discount(); }
     upMax(id) { return id === 'irrigation' || id === 'paratonnerres' ? this.s.plots.length : UP_BY_ID[id].max; }
-    robotCost(id, n = this.s.robots[id] || 0) { const r = ROBOT_BY_ID[id]; return r.cost * Math.pow(r.g, n) * this.discount(); }
+    robotCost(id, n = ROBOT_BY_ID[id].chain === 0 ? this.chainCount() : this.s.robots[id] || 0) { const r = ROBOT_BY_ID[id]; return r.cost * Math.pow(r.g, n) * this.discount(); }
+    // Transformation d'un robot du rang `id` au rang suivant : le prix monte avec le nombre de robots déjà à ce rang.
+    upgradeCost(id, n) { const next = this.chainNext(id); return next ? next.cost * Math.pow(next.g, n == null ? this.s.robots[next.id] || 0 : n) * this.discount() : Infinity; }
     plotCost(n = this.plotEquiv()) { return D.PLOTS.base * Math.pow(D.PLOTS.g, n - D.PLOTS.start) * this.discount(); }
     seedCost(id) { return SEED_BY_ID[id].unlock * Math.pow(0.85, this.tal('recherche')); }
     talCost(id, level = this.tal(id)) {
@@ -404,9 +422,16 @@
     // Description d'un achat : niveau actuel, max, et coût du niveau k au-dessus.
     buyable(kind, id) {
       switch (kind) {
+        case 'sseed': return { level: this.s.seasonShop.bought[id] ? 1 : 0, max: 1, cost: () => this.seasonSeedCost(id) };
         case 'up': return { level: this.lvl(id), max: this.upMax(id), cost: k => this.upCost(id, k) };
         case 'silo': return { level: this.s.trade.silos, max: D.MARKET.siloMax, cost: k => this.siloCost(k) };
-        case 'robot': return { level: this.s.robots[id] || 0, max: this.robotMax(id), cost: k => this.robotCost(id, k) };
+        case 'robot':
+          if (ROBOT_BY_ID[id].chain === 0) return { level: this.chainCount(), max: this.chainMax(), cost: k => this.robotCost(id, k) };
+          return { level: this.s.robots[id] || 0, max: this.robotMax(id), cost: k => this.robotCost(id, k) };
+        case 'rupgrade': {
+          const next = this.chainNext(id), lvl = next ? this.s.robots[next.id] || 0 : 0;
+          return { level: lvl, max: next ? lvl + (this.s.robots[id] || 0) : 0, cost: k => this.upgradeCost(id, k) };
+        }
         case 'plot': return { level: this.s.plots.length, max: this.maxPlots, cost: k => this.plotCost(this.plotEquiv() + k - this.s.plots.length) };
         case 'merge': { const t = +id, lvl = this.tierCount(t); return { level: lvl, max: lvl + Math.floor(this.tierCount(t - 1) / 3), cost: k => this.mergeCost(t, k) }; }
         case 'seed': return { level: this.s.seeds[id] ? 1 : 0, max: 1, cost: () => this.seedCost(id) };
@@ -423,7 +448,9 @@
       if (kind === 'up') return !this.upReqOk(id);
       if (kind === 'silo') return !this.marketOn();
       if (kind === 'seed') return !this.eraOk(SEED_BY_ID[id]);
-      if (kind === 'robot') return !this.eraOk(ROBOT_BY_ID[id]);
+      if (kind === 'sseed') return !SEED_BY_ID[id] || SEED_BY_ID[id].season !== this.seasonId;
+      if (kind === 'robot') return !this.eraOk(ROBOT_BY_ID[id]) || ROBOT_BY_ID[id].chain > 0; // on n'achète que des rouillés
+      if (kind === 'rupgrade') { const next = this.chainNext(id); return !next || !this.eraOk(next); }
       if (kind === 'machine') return !this.factoryOn() || !this.eraOk(MACHINE_BY_ID[id]);
       if (kind === 'frobot' || kind === 'fridge') return !this.factoryOn();
       return false;
@@ -450,16 +477,18 @@
       for (let i = 0; i < q.count; i++) {
         if (kind === 'up') this.s.up[id] = this.lvl(id) + 1;
         else if (kind === 'robot') this.s.robots[id] = (this.s.robots[id] || 0) + 1;
+        else if (kind === 'rupgrade') this.upgradeRobot(id);
         else if (kind === 'plot') this.s.plots.push(this.newPlot());
         else if (kind === 'silo') this.s.trade.silos++;
         else if (kind === 'merge') this.mergePlots(+id);
         else if (kind === 'seed') { this.s.seeds[id] = true; this.s.everSeeds[id] = true; this.emit('seed', { id }); }
+        else if (kind === 'sseed') { this.s.seasonShop.bought[id] = true; this.emit('seed', { id }); }
         else if (kind === 'tal') this.s.tal[id] = this.tal(id) + 1;
         else if (kind === 'machine') this.addMachine(id);
         else if (kind === 'frobot') this.s.factory.robots[id] = (this.s.factory.robots[id] || 0) + 1;
         else if (kind === 'fridge') this.s.factory.fridges++;
       }
-      if (kind === 'robot') this.syncWorkers();
+      if (kind === 'robot' || kind === 'rupgrade') this.syncWorkers();
       if (kind === 'up') this.rebuildFx();
       this.emit('buy', { kind, id });
       return true;
@@ -518,6 +547,23 @@
       this.scare = D.ROBOTS.reduce((a, r) => a * Math.pow(1 - (r.scare || 0), this.s.robots[r.id] || 0), 1);
     }
 
+    // Transforme un robot du rang `id` au rang suivant, sur place : de préférence un robot à la recharge (il est à la grange),
+    // sinon le premier trouvé. Il ressort de l'atelier batterie pleine.
+    upgradeRobot(id) {
+      const next = this.chainNext(id);
+      if (!next || !(this.s.robots[id] > 0)) return false;
+      this.s.robots[id]--;
+      if (!this.s.robots[id]) delete this.s.robots[id];
+      this.s.robots[next.id] = (this.s.robots[next.id] || 0) + 1;
+      const w = this.workers.find(x => x.kind === id && x.state === 'charge') || this.workers.find(x => x.kind === id);
+      if (w) {
+        w.kind = next.id; w.def = next; w.upT = 1.2; w.bat = 1;
+        if (w.state === 'charge' || w.state === 'queue' || (w.state === 'goto' && w.goal === 'charge')) { w.state = 'idle'; w.pause = 0; w.scan = 0; }
+        this.emit('robot-upgrade', { from: id, to: next.id, x: w.x });
+      }
+      return true;
+    }
+
     makeWorker(kind, def) {
       return { id: this.nextWorkerId++, kind, def, x: rand(4, LAYOUT.BARN_W - 4), dir: 1, state: 'idle', task: null, t: 0, dur: 0, pause: rand(0, 1), anim: Math.random() * 10, scan: 0, bat: 1, turboT: 0, ocT: 0, calib: 0 };
     }
@@ -552,16 +598,31 @@
       let dense = plot >= 0 && (type === 'plant' || type === 'harvest') ? this.plotPlants(plot) : 1;
       const crop = plot >= 0 && this.s.plots[plot].crop;
       if (type === 'harvest' && crop && crop.mutant && D.MUTATIONS[crop.mutant].harvest) dense *= D.MUTATIONS[crop.mutant].harvest;
-      return dense * D.ACTIONS[type] * tool * w.def.act / this.workerPace(w) / (w.ocT > 0 ? 2 : 1);
+      const t = D.ACTIONS[type] * tool * w.def.act / this.workerPace(w) / (w.ocT > 0 ? 2 : 1);
+      // Récolte d'un légume de haut niveau : plus longue, avec une part incompressible par plant.
+      const sd = type === 'harvest' && crop ? SEED_BY_ID[crop.id] : null;
+      if (sd && sd.minHarv) return dense * (sd.minHarv + sd.harv * t);
+      return dense * t;
     }
 
     taskFor(i) {
       const pl = this.s.plots[i];
       if (!pl.crop) return 'plant';
       if (pl.crop.pest) return 'treat';
-      if (pl.crop.p >= 1) return pl.crop.mutant === 'infini' ? null : 'harvest'; // l'infinie attend le joueur
+      if (pl.crop.p >= 1) return this.infiniWaits(pl.crop) ? null : 'harvest'; // l'infinie grandit jusqu'à ×300
       if (pl.moist < 0.3 && !this.irrigated(i) && !this.isRaining()) return 'water';
       return null;
+    }
+
+    // Une plante infinie est laissée de côté par les ouvriers (et pets, touristes) tant qu'elle vaut moins de ×autoAt.
+    infiniWaits(crop) { return crop.mutant === 'infini' && 1 + (crop.extra || 0) < D.MUTATIONS.infini.autoAt; }
+
+    // Taille de la récolte : une géante ou une infinie donne plus d'unités au silo (même valeur par unité).
+    cropSize(crop) {
+      const M = crop.mutant ? D.MUTATIONS[crop.mutant] : null;
+      if (!M) return 1;
+      if (M.infinite) return 1 + (crop.extra || 0);
+      return crop.mutant === 'giant' ? M.value : 1;
     }
 
     findTask(w) {
@@ -606,6 +667,7 @@
       if (w.ocT > 0) w.ocT -= dt;
       if (w.shockT > 0) w.shockT -= dt;
       if (w.superT > 0) w.superT -= dt;
+      if (w.upT > 0) w.upT -= dt;
       if (w.frozenT > 0) { // figé par le cri du basilic, la foudre, un corbeau maudit ou une tornade
         w.frozenT -= dt;
         if (w.frozenT <= 0 && w.shockNext) { w.shockT = w.shockNext; w.shockNext = 0; }
@@ -797,7 +859,7 @@
       const lost = !crop.gold && Math.random() < this.pm.nothing;
       if (lost) { v = 0; this.emit('pet-lost', { plot: i }); }
       let stored = null;
-      if (v > 0 && this.marketOn() && source !== 'tourist' && source !== 'fair') stored = this.store(seed, crop.gold ? this.produceTraits().concat('dore') : this.produceTraits(), v, this.plotPlants(i));
+      if (v > 0 && this.marketOn() && source !== 'tourist' && source !== 'fair') stored = this.store(seed, crop.gold ? this.produceTraits().concat('dore') : this.produceTraits(), v, this.plotPlants(i) * this.cropSize(crop));
       else this.earn(v);
       this.harvestBuckets[this.harvestBuckets.length - 1] += v;
       this.addStat('harvest');

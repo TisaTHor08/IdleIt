@@ -93,8 +93,8 @@
       };
       add('auto', S.iconURL('auto', 4), 'Pinceau : Auto (toujours la meilleure graine)', true);
       for (const sd of D.SEEDS) if (g.s.seeds[sd.id]) add(sd.id, S.seedIconURL(sd, 4), 'Pinceau : ' + sd.name);
-      for (const sd of g.seasonSeeds()) add(sd.id, S.seedIconURL(sd, 4), 'Pinceau : ' + sd.name + ' (saison)');
-      this.seedKey = Object.keys(g.s.seeds).join() + '|' + g.seasonId;
+      for (const sd of g.seasonSeeds()) if (g.seasonSeedBought(sd.id)) add(sd.id, S.seedIconURL(sd, 4), 'Pinceau : ' + sd.name + ' (saison)');
+      this.seedKey = this.seedbarKey();
       this.refreshSeedbar();
       requestAnimationFrame(() => this.layoutOverlays());
     }
@@ -117,7 +117,7 @@
       this.envWeather.classList.toggle('off', g.s.clock.weather === 'soleil');
       this.setSrc(this.envFrenzy, S.iconURL('frenzy', 4));
       this.envFrenzy.classList.toggle('off', !g.frenzy());
-      if (Object.keys(g.s.seeds).join() + '|' + g.seasonId !== this.seedKey) this.buildSeedbar();
+      if (this.seedbarKey() !== this.seedKey) this.buildSeedbar();
       for (const b of $('menu').children) b.classList.toggle('on', b.dataset.tab === this.tab);
     }
 
@@ -256,6 +256,14 @@
     }
 
     // Contenu d'une ère encore trop lointaine : on le tait (une ère d'avance est visible, verrouillée).
+    seedbarKey() { const g = this.game; return Object.keys(g.s.seeds).join() + '|' + g.seasonId + '|' + Object.keys((g.s.seasonShop && g.s.seasonShop.bought) || {}).join(); }
+    // Légumes de haut niveau : temps actuel avec tes bonus, et durées incompressibles.
+    slowNote(sd) {
+      if (!sd.minGrow) return '';
+      const t = v => v < 10 ? v.toFixed(1).replace('.', ',') + ' s' : fmtTime(v);
+      const now = this.game.seedGrowTime(sd);
+      return ` (${t(now)} avec tes bonus, jamais moins de ${t(sd.minGrow)}) · récolte d'au moins ${t(sd.minHarv)} par plant`;
+    }
     eraVisible(item) { return (item.pr || 0) <= this.game.prestiges() + 1; }
     eraNote(item) { return this.game.eraOk(item) ? '' : ` <span style="color:var(--bad)">Se débloque après ${item.pr} renaissance${item.pr > 1 ? 's' : ''}.</span>`; }
 
@@ -268,7 +276,7 @@
           { id: 'brush', label: 'Pinceau', enabled: true, cls: g.brush === 'auto' ? 'on' : '', onClick: () => { g.brush = g.brush === 'auto' ? null : 'auto'; this.refreshSeedbar(); } },
         ],
       }];
-      // Saison en cours : ses bonus et ses deux plantes (gratuites, seulement pendant la saison).
+      // Saison en cours : ses bonus et ses deux plantes (à acheter à chaque saison, prix figé à son début).
       const season = g.seasonDef();
       if (season) {
         const end = g.seasonInfo.end ? g.seasonInfo.end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : '';
@@ -277,11 +285,12 @@
           const val = g.seedValue(sd) * g.valueMult() * g.harvestMult(sd, g.robotCount() ? 'robot' : 'farmer') * g.fxValue(sd);
           items.push({
             key: 'ss-' + sd.id, icon: S.seedIconURL(sd, 3), title: sd.name + ' (saison)',
-            desc: `<span class="muted">${D.FAMILIES[sd.fam].name}</span> · ${sd.desc} Pousse en ${fmtTime(sd.grow)} · vaut <b>${fmt(val)} $</b>.`,
-            buttons: [
+            desc: `<span class="muted">${D.FAMILIES[sd.fam].name}</span> · ${sd.desc} Pousse en ${fmtTime(sd.grow)}${this.slowNote(sd)} · vaut <b>${fmt(val)} $</b>.`,
+            locked: !g.seasonSeedBought(sd.id),
+            buttons: g.seasonSeedBought(sd.id) ? [
               { id: 'all', label: 'Partout', enabled: true, onClick: () => g.setAllPlots(sd.id) },
               { id: 'brush', label: 'Pinceau', enabled: true, cls: g.brush === sd.id ? 'on' : '', onClick: () => { g.brush = g.brush === sd.id ? null : sd.id; this.refreshSeedbar(); } },
-            ],
+            ] : [{ ...this.buyButton('sseed', sd.id, 'Acheter pour la saison'), tip: 'Débloquée jusqu’à la fin de la saison, même après une renaissance. Prix fixé au début de la saison.' }],
           });
         }
       }
@@ -292,7 +301,7 @@
         const val = sd.value * g.valueMult() * g.harvestMult(sd, g.robotCount() ? 'robot' : 'farmer') * g.fxValue(sd);
         const rate = val / sd.grow;
         const fam = D.FAMILIES[sd.fam].name;
-        const desc = `<span class="muted">${fam}</span> · ${sd.desc} Pousse en ${fmtTime(sd.grow)} · vaut <b>${fmt(val)} $</b> (${fmt(rate)} $/s par parcelle)`
+        const desc = `<span class="muted">${fam}</span> · ${sd.desc} Pousse en ${fmtTime(sd.grow)}${this.slowNote(sd)} · vaut <b>${fmt(val)} $</b> (${fmt(rate)} $/s par parcelle)`
           + (sd.thirst > 1.2 ? ' · assoiffée' : '') + (sd.night ? ' · nocturne' : '') + (g.marketOn() ? ` · se garde ~${fmtTime(g.shelfLife(sd.id))}` : '') + this.eraNote(sd);
         const buttons = unlocked ? [
           { id: 'all', label: 'Partout', enabled: true, tip: 'Planter cette graine sur toutes les parcelles', onClick: () => g.setAllPlots(sd.id) },
@@ -359,11 +368,26 @@
           + (g.evActive('outage') ? ' · <b style="color:var(--bad)">PANNE DE COURANT</b>' : ''),
         buttons: [],
       };
-      return [bat].concat(D.ROBOTS.filter(r => this.eraVisible(r)).map(r => ({
+      const stats = r => r.only === 'none' ? '' : ` Vitesse ×${(r.walk / D.FARMER.walk).toFixed(1)}, travail ×${(1 / r.act).toFixed(1)}${r.noBattery ? ', sans batterie' : ''}.`;
+      // Robots polyvalents : on achète des rouillés, puis on les transforme un par un au rang suivant.
+      const chain = D.ROBOT_CHAIN.filter(r => this.eraVisible(r) && (r.chain === 0 || g.eraOk(r) || g.eraOk(D.ROBOT_CHAIN[r.chain - 1]))).map(r => {
+        const next = g.chainNext(r.id), n = g.s.robots[r.id] || 0;
+        const buttons = [];
+        if (r.chain === 0) buttons.push(this.buyButton('robot', r.id));
+        if (next) buttons.push({ ...this.buyButton('rupgrade', r.id, 'Améliorer'), id: 'up', tip: `Transforme un ${r.name.toLowerCase()} en ${next.name.toLowerCase()}.` });
+        const head = r.chain === 0 ? ` <span class="muted">On n'achète que des rouillés, puis on les améliore un par un.</span>` : '';
+        const up = next ? (g.eraOk(next) ? ` Améliorable en <b>${next.name}</b>.` : ` <span class="muted">${next.name} : après ${next.pr} renaissance${next.pr > 1 ? 's' : ''}.</span>`) : ' <b>Dernier rang.</b>';
+        return {
+          key: 'r-' + r.id, icon: S.robotIconURL(r.id), title: `${r.chain + 1}. ${r.name}`, level: r.chain === 0 ? `${n} · total ${g.chainCount()} / ${g.chainMax()}` : `${n}`,
+          desc: r.desc + stats(r) + (g.eraOk(r) ? up : this.eraNote(r)) + head, locked: !g.eraOk(r), buttons,
+        };
+      });
+      const specialists = D.ROBOTS.filter(r => r.chain == null && this.eraVisible(r)).map(r => ({
         key: 'r-' + r.id, icon: S.robotIconURL(r.id), title: r.name, level: `${g.s.robots[r.id] || 0} / ${g.robotMax(r.id)}`,
-        desc: `${r.desc}` + (r.only === 'none' ? '' : ` Vitesse ×${(r.walk / D.FARMER.walk).toFixed(1)}, travail ×${(1 / r.act).toFixed(1)}.`) + this.eraNote(r),
+        desc: `<span class="muted">Spécialiste</span> · ${r.desc}` + stats(r) + this.eraNote(r),
         locked: !g.eraOk(r), buttons: [this.buyButton('robot', r.id)],
-      })));
+      }));
+      return [bat, ...chain, ...specialists];
     }
 
     buildSpec(body) {
@@ -827,7 +851,7 @@
       line('Opacité', op);
 
       const fps = el('select');
-      for (const [v, l] of [[15, 'Fluide (15 images/s)'], [10, 'Équilibrée (10 images/s)'], [5, 'Sobre (5 images/s)']]) { const o = el('option', null, l); o.value = v; if (v === (s.fps || 10)) o.selected = true; fps.appendChild(o); }
+      for (const [v, l] of [[60, 'Ultra fluide (60 images/s)'], [30, 'Très fluide (30 images/s)'], [15, 'Fluide (15 images/s)'], [10, 'Équilibrée (10 images/s)'], [5, 'Sobre (5 images/s)']]) { const o = el('option', null, l); o.value = v; if (v === (s.fps || 10)) o.selected = true; fps.appendChild(o); }
       fps.onchange = () => api.setSetting('fps', +fps.value);
       line('Animation', fps, 'Moins d’images par seconde = moins de processeur. Le jeu avance pareil.');
 
@@ -874,6 +898,36 @@
       choose.onclick = async () => apply(await api.chooseSaveDir());
       toDefault.onclick = async () => apply(await api.defaultSaveDir());
       open.onclick = () => api.openSaveDir();
+
+      // Mise à jour : automatique (vérifiée au lancement puis toutes les 4 h), ou à la demande avec ce bouton.
+      if (api.checkUpdate) {
+        const upBox = el('div', 'btns');
+        const upBtn = el('button', 'buy', 'Mettre à jour');
+        const upInfo = el('span', 'muted', '');
+        upBox.append(upBtn, upInfo);
+        line('Mise à jour', upBox, 'Vérifiée toute seule au lancement puis toutes les 4 h : la nouvelle version s’installe et la ferme redémarre (ta partie est gardée).');
+        const show = u => {
+          if (!u || !upInfo.isConnected) return;
+          const cur = 'v' + u.current;
+          const txt = {
+            dev: cur + ' · version de dev',
+            idle: cur,
+            checking: cur + ' · recherche…',
+            none: cur + ' · à jour',
+            available: cur + ' · v' + u.version + ' disponible' + (u.portable ? ' (clique pour la télécharger)' : ''),
+            downloading: cur + ' · téléchargement de v' + u.version + '… ' + (u.percent || 0) + ' %',
+            downloaded: cur + ' · v' + u.version + ' prête, redémarrage…',
+            error: cur + ' · échec : ' + (u.error || 'erreur inconnue'),
+          }[u.status] || cur;
+          upInfo.textContent = txt;
+          upBtn.textContent = u.status === 'available' && u.portable ? 'Télécharger' : u.status === 'downloaded' ? 'Installer' : 'Mettre à jour';
+          upBtn.disabled = u.status === 'dev' || u.status === 'checking' || u.status === 'downloading';
+        };
+        upBtn.onclick = async () => show(await api.checkUpdate());
+        api.getUpdate().then(show);
+        if (!this.updateHooked) { this.updateHooked = true; api.onUpdateStatus(u => { this.updateState = u; if (this.updateShow) this.updateShow(u); }); }
+        this.updateShow = show;
+      }
 
       const actions = el('div', 'btns');
       const hide = el('button', 'buy', 'Masquer'); hide.onclick = () => api.hide();

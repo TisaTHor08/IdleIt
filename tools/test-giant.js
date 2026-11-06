@@ -45,6 +45,12 @@ g.s.plots[0].moist = 1;
 for (let t = 0; t < 30; t += 0.1) g.tick(0.1);
 assert.ok(g.s.plots[0].crop.extra > 1, 'continue de grandir');
 assert.ok(value(0) > base * 2, 'sa valeur a augmenté');
+// À partir de ×300, les ouvriers la récoltent.
+crop(0, 'infini'); g.s.plots[0].crop.extra = 298;
+assert.strictEqual(g.taskFor(0), null, '×299 : encore laissée');
+g.s.plots[0].crop.extra = 299;
+assert.strictEqual(g.taskFor(0), 'harvest', '×300 : récoltée par les ouvriers');
+value(0);
 // Carnivore : attrape un robot, libéré quand un autre la récolte, vaut ×2.
 const h = new Game(null);
 h.s.money = 1e12; h.buy('robot', 'rouille', 2); h.buy('tal', 'labo');

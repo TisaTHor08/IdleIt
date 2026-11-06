@@ -16,6 +16,10 @@ contextBridge.exposeInMainWorld('api', {
   defaultSaveDir: () => ipcRenderer.invoke('default-save-dir'),
   setSaveDir: (dir, mode, txt) => ipcRenderer.sendSync('set-save-dir', dir, mode, txt),
   openSaveDir: () => ipcRenderer.send('open-save-dir'),
+  getUpdate: () => ipcRenderer.invoke('update-get'),
+  checkUpdate: () => ipcRenderer.invoke('update-check'),
+  onUpdateStatus: cb => ipcRenderer.on('update-status', (_e, s) => cb(s)),
+  openReleases: () => ipcRenderer.send('open-releases'),
   hide: () => ipcRenderer.send('hide'),
   quit: () => ipcRenderer.send('quit'),
 });

@@ -103,7 +103,7 @@
   });
 
   // ---------- Boucles (sobres : c'est un jeu qui tourne toute la journée) ----------
-  // Simulation à 5 Hz (continue quand la fenêtre est masquée), rendu à 5-15 images/s (réglage Animation) seulement quand la ferme est visible.
+  // Simulation à 5 Hz (continue quand la fenêtre est masquée), rendu à 5-60 images/s (réglage Animation) seulement quand la ferme est visible.
   const TICK_MS = 200, STEP = 0.25;
   const fps = () => (ui.settings && ui.settings.fps) || 10;
   let last = performance.now();

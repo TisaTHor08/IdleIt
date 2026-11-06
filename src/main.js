@@ -357,34 +357,66 @@ app.on('before-quit', e => {
 // seulement le joueur avec un lien vers la release.
 const UPDATE_EVERY = 4 * 3600 * 1000;
 const RELEASES_URL = 'https://github.com/TisaTHor08/IdleIt/releases/latest';
+// État de la mise à jour, affiché dans les paramètres (bouton « Mettre à jour »).
+// status : dev | idle | checking | none | available | downloading | downloaded | error
+let updater = null;
+let updateState = { status: 'idle', current: app.getVersion() };
+const portableBuild = () => !!process.env.PORTABLE_EXECUTABLE_DIR;
+function setUpdateState(patch) {
+  updateState = { ...updateState, ...patch, current: app.getVersion(), portable: portableBuild() };
+  if (win && !win.isDestroyed()) win.webContents.send('update-status', updateState);
+}
+// Dernière sauvegarde, puis installation silencieuse et relance.
+function installUpdate() {
+  if (!updater || updateState.status !== 'downloaded') return;
+  if (tray) tray.displayBalloon({ title: 'Mise à jour ' + updateState.version, content: 'La ferme se met à jour et redémarre…', iconType: 'info' });
+  if (win && !win.isDestroyed()) win.webContents.send('flush-save');
+  setTimeout(() => { quitting = true; updater.quitAndInstall(true, true); }, 1500);
+}
+function checkUpdate() {
+  if (!updater) return Promise.resolve(updateState);
+  if (updateState.status === 'checking' || updateState.status === 'downloading') return Promise.resolve(updateState);
+  if (updateState.status === 'downloaded') { installUpdate(); return Promise.resolve(updateState); }
+  setUpdateState({ status: 'checking', error: null });
+  return updater.checkForUpdates().then(() => updateState)
+    .catch(e => { setUpdateState({ status: 'error', error: (e && e.message) || String(e) }); return updateState; });
+}
 function setupAutoUpdate() {
-  if (!app.isPackaged || process.argv.some(a => a === '--farm-shots' || a === '--farm-savetest' || a === '--farm-perf')) return;
-  let autoUpdater;
-  try { ({ autoUpdater } = require('electron-updater')); } catch (e) { console.error('electron-updater absent', e); return; }
-  const portable = !!process.env.PORTABLE_EXECUTABLE_DIR;
-  autoUpdater.autoDownload = !portable;
-  autoUpdater.autoInstallOnAppQuit = !portable;
+  if (!app.isPackaged || process.argv.some(a => a === '--farm-shots' || a === '--farm-savetest' || a === '--farm-perf')) { setUpdateState({ status: 'dev' }); return; }
+  try { ({ autoUpdater: updater } = require('electron-updater')); } catch (e) { console.error('electron-updater absent', e); updater = null; setUpdateState({ status: 'error', error: 'module de mise à jour absent' }); return; }
+  const portable = portableBuild();
+  updater.autoDownload = !portable;
+  updater.autoInstallOnAppQuit = !portable;
   let notified = null;
-  autoUpdater.on('error', e => console.error('Mise à jour :', e && e.message));
-  autoUpdater.on('update-available', info => {
+  updater.on('error', e => { console.error('Mise à jour :', e && e.message); setUpdateState({ status: 'error', error: (e && e.message) || String(e) }); });
+  updater.on('checking-for-update', () => setUpdateState({ status: 'checking' }));
+  updater.on('update-not-available', () => setUpdateState({ status: 'none', checkedAt: Date.now() }));
+  updater.on('update-available', info => {
+    setUpdateState({ status: portable ? 'available' : 'downloading', version: info.version, percent: 0 });
     if (!portable || notified === info.version || !tray) return;
     notified = info.version;
     tray.displayBalloon({ title: 'Farmling ' + info.version + ' disponible',
       content: 'Clique ici pour télécharger la nouvelle version portable.', iconType: 'info' });
     tray.once('balloon-click', () => shell.openExternal(RELEASES_URL));
   });
-  autoUpdater.on('update-downloaded', info => {
+  updater.on('download-progress', p => setUpdateState({ status: 'downloading', percent: Math.round(p.percent || 0) }));
+  updater.on('update-downloaded', info => {
     if (portable) return;
-    if (tray) tray.displayBalloon({ title: 'Mise à jour ' + info.version, content: 'La ferme se met à jour et redémarre…', iconType: 'info' });
-    // Dernière sauvegarde, puis installation silencieuse et relance.
-    if (win && !win.isDestroyed()) win.webContents.send('flush-save');
-    setTimeout(() => { quitting = true; autoUpdater.quitAndInstall(true, true); }, 1500);
+    setUpdateState({ status: 'downloaded', version: info.version, percent: 100 });
+    installUpdate();
   });
-  const check = () => autoUpdater.checkForUpdates().catch(e => console.error('Mise à jour :', e && e.message));
-  setTimeout(check, 30 * 1000);
-  setInterval(check, UPDATE_EVERY);
+  setTimeout(checkUpdate, 30 * 1000);
+  setInterval(checkUpdate, UPDATE_EVERY);
 }
 app.whenReady().then(setupAutoUpdate);
+ipcMain.handle('update-get', () => ({ ...updateState, current: app.getVersion(), portable: portableBuild() }));
+// Bouton « Mettre à jour » : vérifie tout de suite ; si une version est prête, l'installe et relance.
+// En portable, ouvre la page de la release (un exe portable ne peut pas se remplacer lui-même).
+ipcMain.handle('update-check', () => {
+  if (portableBuild() && updateState.status === 'available') { shell.openExternal(RELEASES_URL); return updateState; }
+  return checkUpdate();
+});
+ipcMain.on('open-releases', () => shell.openExternal(RELEASES_URL));
 
 ipcMain.on('hide', () => { if (win) win.hide(); });
 ipcMain.on('quit', () => app.quit());

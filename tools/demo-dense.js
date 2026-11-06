@@ -8,7 +8,7 @@
   for (let k = 0; k < 3; k++) g.buy('merge', 2);
   g.buy('merge', 3);
   for (let k = 0; k < 2; k++) g.buy('merge', 1);
-  g.buy('robot', 'rouille', 8); g.buy('robot', 'chrome', 3);
+  g.buy('robot', 'rouille', 11); g.buy('rupgrade', 'rouille', 3);
   g.buy('up', 'mini_rouille');
   g.s.clock.t = Math.floor(g.s.clock.t / 480) * 480 + 240;
   g.s.clock.weather = 'soleil'; g.s.clock.weatherT = 999;

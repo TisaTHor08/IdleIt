@@ -8,9 +8,9 @@
   g.s.money = 1e14;
   for (let i = 0; i < 20; i++) g.buy('plot');
   for (const sd of D.SEEDS) if (g.eraOk(sd)) g.buy('seed', sd.id);
-  g.buy('robot', 'rouille', 3);
+  g.buy('robot', 'rouille', 4);
   g.buy('robot', 'arroseur', 2);
-  g.buy('robot', 'drone', 1);
+  g.buy('rupgrade', 'rouille'); g.buy('rupgrade', 'chrome'); g.buy('rupgrade', 'laser');
   for (const id of ['poussin', 'chat', 'chien']) g.adoptPet(id);
   const [a, b] = g.s.pets.list;
   a.xp = 1e9; b.xp = 1e5;

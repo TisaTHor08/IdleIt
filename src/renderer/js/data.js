@@ -36,6 +36,13 @@
   // Courbe économique : valeur ×valueR, pousse ×growR par rang. Prix : ×unlockR par légume dans l'ère 1 ;
   // ensuite, le k-ième légume d'une ère coûte eraMult[k] × le seuil de la renaissance précédente.
   const ECO = { valueR: 2.9, growBase: 5, growR: 1.105, growMax: 600, unlockBase: 30, unlockR: 20, eraMult: [0.3, 1, 3] };
+  // Légumes de haut niveau (à partir du rang `from`) : f = 0 → 1 jusqu'au dernier, puis k = f^pow.
+  //   pousse ×(1 + growMult·k), avec une durée incompressible minGrow = floorG·k : temps = minGrow + (pousse - minGrow) / bonus ;
+  //   récolte : durée incompressible minHarv = floorH·k par plant, plus harv = 1 + harvK·k fois le temps de récolte normal.
+  // Tout au max (tools/max-speed.js : améliorations, talents, meilleurs compagnons), le plus lent atteint ces planchers :
+  // 2 min de pousse et 20 s de récolte (parcelle simple).
+  // valeur ×(cycle nouveau / cycle ancien) pour un bonus de croissance typique mRef : les revenus suivent.
+  const SLOW = { from: 12, pow: 4, growMult: 11, floorG: 120, floorH: 20, harvK: 40, mRef: 24 };
 
   // [id, nom, famille, forme, feuillage, fruit, renaissances requises, options]
   const SEED_LIST = [
@@ -92,10 +99,16 @@
     const k = eraIndex[pr] = eraIndex[pr] == null ? 0 : eraIndex[pr] + 1;
     const unlock = i === 0 ? 0 : pr === 0 ? ECO.unlockBase * Math.pow(ECO.unlockR, i - 1)
       : threshold(pr - 1) * ECO.eraMult[Math.min(k, ECO.eraMult.length - 1)] * Math.pow(10, Math.max(0, k - ECO.eraMult.length + 1));
+    const grow0 = o.grow || Math.min(ECO.growMax, Math.round(ECO.growBase * Math.pow(ECO.growR, i)));
+    const f = Math.max(0, (i - SLOW.from + 1) / (SEED_LIST.length - SLOW.from)), sk = Math.pow(f, SLOW.pow);
+    const grow = Math.round(grow0 * (1 + SLOW.growMult * sk));
+    const minGrow = Math.round(SLOW.floorG * sk * 10) / 10, minHarv = Math.round(SLOW.floorH * sk * 10) / 10;
+    const cycle = (gr, mg, mh, h) => mg + (gr - mg) / SLOW.mRef + mh + h;
+    const value0 = o.value || Math.round(Math.pow(ECO.valueR, i) * 100) / 100;
     return {
       id, name, fam, shape, leaf, fruit, pr, eraK: k, rank: i, thirst: 1, desc: '', ...o,
-      value: o.value || Math.round(Math.pow(ECO.valueR, i) * 100) / 100,
-      grow: o.grow || Math.min(ECO.growMax, Math.round(ECO.growBase * Math.pow(ECO.growR, i))),
+      value: sk ? +(value0 * cycle(grow, minGrow, minHarv, 1 + SLOW.harvK * sk) / cycle(grow0, 0, 0, 1)).toPrecision(4) : value0,
+      grow, minGrow, minHarv, harv: Math.round((1 + SLOW.harvK * sk) * 100) / 100,
       unlock: o.unlock != null ? o.unlock : Math.round(unlock),
       shelf: o.shelf || FAMILIES[fam].shelf,
     };
@@ -107,24 +120,35 @@
 
   // only : ne fait que cette tâche ('plant' | 'water' | 'harvest' | 'treat' | 'none') ; tag : famille pour les bonus ;
   // pr : renaissances requises ; noBattery : jamais besoin de recharger ; scare : éloigne les corbeaux ; hub : booste les autres robots.
+  // chain : rang dans la chaîne des robots polyvalents. On n'achète que des robots rouillés (rang 0) ; chacun peut ensuite être
+  // transformé, un par un, au rang suivant (cost × g^(robots déjà à ce rang)). Les autres robots sont des spécialistes achetés à part.
   const ROBOTS = [
-    { id: 'rouille', name: 'Robot rouillé', tag: 'ancien', desc: 'Grince, mais bosse plus vite que toi.', walk: 20, act: 0.85, cost: 150, g: 1.55, max: 12 },
-    { id: 'arroseur', name: 'Robot arroseur', tag: 'ancien', desc: 'Ne fait qu\'arroser, très vite.', walk: 26, act: 0.25, cost: 400, g: 1.5, max: 12, only: 'water' },
+    { id: 'rouille', chain: 0, name: 'Robot rouillé', tag: 'ancien', desc: 'Grince, mais bosse plus vite que toi.', walk: 20, act: 0.85, cost: 150, g: 1.2, max: 40 },
+    { id: 'chrome', chain: 1, name: 'Robot chromé', tag: 'moderne', desc: 'Rapide et brillant.', walk: 32, act: 0.55, cost: 1e4, g: 1.2, max: 40 },
+    { id: 'laser', chain: 2, name: 'Robot laser', tag: 'moderne', desc: 'Récolte au laser.', walk: 48, act: 0.35, cost: 3e7, g: 1.2, max: 40, pr: 1 },
+    { id: 'drone', chain: 3, name: 'Drone agricole', tag: 'volant', desc: 'Vole au-dessus du champ.', walk: 75, act: 0.22, cost: 2e10, g: 1.2, max: 40, fly: true, pr: 2 },
+    { id: 'tracteur', chain: 4, name: 'Tracteur autonome', tag: 'moderne', desc: 'Plante et récolte à toute allure.', walk: 85, act: 0.16, cost: 4e11, g: 1.2, max: 40, pr: 3 },
+    { id: 'quantique', chain: 5, name: 'Androïde quantique', tag: 'futur', desc: 'Existe à plusieurs endroits à la fois.', walk: 140, act: 0.12, cost: 2e13, g: 1.2, max: 40, pr: 4 },
+    { id: 'golem', chain: 6, name: 'Golem de terre', tag: 'futur', desc: 'Infatigable : n’a plus jamais besoin de recharger.', walk: 150, act: 0.09, cost: 2e18, g: 1.2, max: 40, noBattery: true, pr: 7 },
+    { id: 'nanoessaim', chain: 7, name: 'Nano-essaim', tag: 'futur', desc: 'Des milliers de robots minuscules, sans batterie.', walk: 170, act: 0.065, cost: 5e22, g: 1.2, max: 40, noBattery: true, pr: 10 },
+    { id: 'plasma', chain: 8, name: 'Robot à plasma', tag: 'futur', desc: 'Son cœur de plasma ne s’éteint jamais.', walk: 200, act: 0.05, cost: 2e23, g: 1.2, max: 40, noBattery: true, pr: 12 },
+    { id: 'chrono', chain: 9, name: 'Chronobot', tag: 'futur', desc: 'Il a déjà fini avant d’avoir commencé.', walk: 240, act: 0.038, cost: 2e25, g: 1.2, max: 40, noBattery: true, pr: 14 },
+    { id: 'titan', chain: 10, name: 'Titan stellaire', tag: 'futur', desc: 'Forgé dans le cœur d’une étoile.', walk: 280, act: 0.029, cost: 2e27, g: 1.2, max: 40, noBattery: true, pr: 16 },
+    { id: 'astral', chain: 11, name: 'Gardien astral', tag: 'futur', desc: 'Il plane entre les constellations.', walk: 330, act: 0.022, cost: 2e29, g: 1.2, max: 40, noBattery: true, fly: true, pr: 18 },
+    { id: 'sylve', chain: 12, name: 'Esprit de l’Arbre-monde', tag: 'futur', desc: 'La forêt elle-même, venue t’aider.', walk: 400, act: 0.016, cost: 2e31, g: 1.2, max: 40, noBattery: true, pr: 20 },
+    // Spécialistes
+    { id: 'arroseur', name: 'Robot arroseur', tag: 'ancien', desc: 'Ne fait qu’arroser, très vite.', walk: 26, act: 0.25, cost: 400, g: 1.5, max: 12, only: 'water' },
     { id: 'semeur', name: 'Robot semeur', tag: 'ancien', desc: 'Ne fait que planter, très vite.', walk: 26, act: 0.3, cost: 900, g: 1.5, max: 12, only: 'plant' },
     { id: 'moissonneur', name: 'Moissonneuse', tag: 'moderne', desc: 'Ne fait que récolter, très vite.', walk: 30, act: 0.3, cost: 2500, g: 1.5, max: 12, only: 'harvest' },
     { id: 'paratonnerre', name: 'Robot paratonnerre', tag: 'moderne', desc: 'Lent au quotidien, mais attire la foudre : foudroyé, il devient 200× plus rapide pendant 5 s.', walk: 12, act: 1.3, cost: 3000, g: 1.6, max: 8, rod: true },
     { id: 'soigneur', name: 'Robot soigneur', tag: 'moderne', desc: 'Ne fait que traiter les ravageurs.', walk: 30, act: 0.3, cost: 5000, g: 1.6, max: 8, only: 'treat' },
-    { id: 'chrome', name: 'Robot chromé', tag: 'moderne', desc: 'Rapide et brillant.', walk: 32, act: 0.55, cost: 2e4, g: 1.6, max: 12 },
-    { id: 'laser', name: 'Robot laser', tag: 'moderne', desc: 'Récolte au laser.', walk: 48, act: 0.35, cost: 3e7, g: 1.65, max: 12, pr: 1 },
     { id: 'epouvantail_r', name: 'Robot épouvantail', tag: 'ancien', desc: 'Ne travaille pas, mais chacun éloigne 15% des corbeaux.', walk: 8, act: 1, cost: 2e8, g: 2.2, max: 5, only: 'none', scare: 0.15, pr: 1 },
-    { id: 'drone', name: 'Drone agricole', tag: 'volant', desc: 'Vole au-dessus du champ.', walk: 75, act: 0.22, cost: 2e10, g: 1.7, max: 12, fly: true, pr: 2 },
-    { id: 'tracteur', name: 'Tracteur autonome', tag: 'moderne', desc: 'Plante et récolte à toute allure, mais vide sa batterie 2× plus vite.', walk: 24, act: 0.12, cost: 4e11, g: 1.7, max: 8, drain: 2, pr: 3 },
-    { id: 'quantique', name: 'Androïde quantique', tag: 'futur', desc: 'Existe à plusieurs endroits à la fois.', walk: 140, act: 0.12, cost: 2e13, g: 1.75, max: 12, pr: 4 },
     { id: 'abeille_meca', name: 'Abeille mécanique', tag: 'volant', desc: 'Ne fait que récolter, en volant, très vite.', walk: 95, act: 0.1, cost: 3e15, g: 1.7, max: 12, fly: true, only: 'harvest', pr: 5 },
-    { id: 'golem', name: 'Golem de terre', tag: 'futur', desc: 'Lent, mais n\'a jamais besoin de recharger.', walk: 12, act: 0.3, cost: 2e18, g: 1.8, max: 10, noBattery: true, pr: 7 },
-    { id: 'nanoessaim', name: 'Nano-essaim', tag: 'futur', desc: 'Des milliers de robots minuscules : foudroyant, mais vide sa batterie 3× plus vite.', walk: 160, act: 0.05, cost: 5e22, g: 1.8, max: 10, drain: 3, pr: 10 },
     { id: 'ia', name: 'Intelligence centrale', tag: 'futur', desc: 'Ne travaille pas : chaque exemplaire rend tous les autres robots 8% plus efficaces.', walk: 6, act: 1, cost: 2e27, g: 2.5, max: 5, only: 'none', hub: 0.08, noBattery: true, pr: 13 },
   ];
+  const ROBOT_CHAIN = ROBOTS.filter(r => r.chain != null).sort((a, b) => a.chain - b.chain);
+  // Robots polyvalents : max + perUsine × niveau du talent « usine », tous rangs confondus.
+  const CHAIN_CAP = { max: 80, perUsine: 8 };
 
   // Temps d'action de base (secondes) pour le fermier.
   const ACTIONS = { plant: 1.4, water: 0.9, harvest: 1.1, treat: 1.2 };
@@ -204,9 +228,9 @@
     { id: 'calibrage', tab: 'robots', name: 'Calibrage', desc: 'Après une recharge : les 4 récoltes suivantes valent ×2.', base: 5e6, g: 1, max: 1, boost: true },
     { id: 'replant', tab: 'robots', name: 'Algorithme de replantation', desc: 'Chaque récolte replante instantanément.', base: 25000, g: 1, max: 1 },
     { id: 'huile', tab: 'robots', name: 'Huile de graissage', desc: 'Robots anciens (rouillé, arroseur, semeur, épouvantail) +12%.', base: 5000, g: 2.4, max: 15, fx: [{ k: 'robot', tag: 'ancien', mult: 1.12 }] },
-    { id: 'puces', tab: 'robots', name: 'Puces neuronales', desc: 'Robots modernes (chromé, laser, moissonneuse, soigneur, tracteur...) +12%.', base: 5e4, g: 2.5, max: 15, fx: [{ k: 'robot', tag: 'moderne', mult: 1.12 }] },
-    { id: 'helices', tab: 'robots', name: 'Hélices en carbone', desc: 'Robots volants +15%.', base: 5e11, g: 2.6, max: 15, pr: 2, fx: [{ k: 'robot', tag: 'volant', mult: 1.15 }] },
-    { id: 'supraconducteurs', tab: 'robots', name: 'Supraconducteurs', desc: 'Robots du futur (quantique, golem, nano-essaim) +12%.', base: 5e14, g: 2.7, max: 15, pr: 4, fx: [{ k: 'robot', tag: 'futur', mult: 1.12 }] },
+    { id: 'puces', tab: 'robots', name: 'Puces neuronales', desc: 'Robots modernes (chromé, laser, tracteur, moissonneuse, soigneur, paratonnerre) +12%.', base: 5e4, g: 2.5, max: 15, fx: [{ k: 'robot', tag: 'moderne', mult: 1.12 }] },
+    { id: 'helices', tab: 'robots', name: 'Hélices en carbone', desc: 'Robots volants (drone, abeille mécanique, gardien astral) +15%.', base: 5e11, g: 2.6, max: 15, pr: 2, fx: [{ k: 'robot', tag: 'volant', mult: 1.15 }] },
+    { id: 'supraconducteurs', tab: 'robots', name: 'Supraconducteurs', desc: 'Robots du futur (quantique, golem, nano-essaim et au-delà, intelligence centrale) +12%.', base: 5e14, g: 2.7, max: 15, pr: 4, fx: [{ k: 'robot', tag: 'futur', mult: 1.12 }] },
     { id: 'blindage', tab: 'robots', name: 'Blindage', desc: 'Les robots restent figés 25% moins longtemps (foudre, corbeaux maudits, tornades...).', base: 3e6, g: 4, max: 3, fx: [{ k: 'frozen', mult: 0.75 }] },
     // Marché (débloqué à MARKET.unlockAt gagnés dans une partie). req : prérequis ; market : nécessite le déblocage.
     { id: 'licence', tab: 'marche', name: 'Licence de trading', desc: 'Les récoltes vont dans les silos pour être revendues au cours du marché. Le surplus part au marché classique (75%, prix fixe).', base: 1e6, g: 1, max: 1, market: true },
@@ -221,6 +245,7 @@
     { id: 'trader_comm', tab: 'marche', name: 'Trader : négociation', desc: 'Commission -2%.', base: 2e6, g: 3, max: 5, req: { trader: 1 } },
     { id: 'trader_lots', tab: 'marche', name: 'Trader : ventes fractionnées', desc: 'Vend par plus petits lots pour moins faire baisser les prix.', base: 4e6, g: 3, max: 4, req: { trader: 1 } },
     { id: 'trader_vif', tab: 'marche', name: 'Trader : réactivité', desc: 'Surveille les cours plus souvent.', base: 1.5e6, g: 2.5, max: 5, req: { trader: 1 } },
+    { id: 'trader_vision', tab: 'marche', name: 'Trader : vision du stock', desc: 'Le trader suit le remplissage des silos et ce qui arrive des champs : plus les silos se remplissent, moins il est exigeant sur le prix, et il vend à l\'avance pour garder de la place. Chaque niveau anticipe plus loin.', base: 5e6, g: 3, max: 3, req: { trader: 1 } },
     { id: 'gestion', tab: 'marche', name: 'Embaucher un gestionnaire', desc: 'Choisit les graines des parcelles selon les cours et les commandes (sans dépasser le seuil d\'épidémie).', base: 2e7, g: 1, max: 1, req: { trader: 1 } },
     { id: 'gestion_part', tab: 'marche', name: 'Gestionnaire : délégation', desc: 'Il gère 25% du champ de plus (25% au départ).', base: 1e7, g: 3, max: 3, req: { gestion: 1 } },
   ];
@@ -237,6 +262,9 @@
     depthTier: 6, depthSlope: 1.5, depthMin: 0.25,
     supplyDepth: 2, supplyMemory: 300,
     traderEvery: 8, traderTarget: 1.05, traderBusy: 0.3, traderBusyTarget: 0.9, traderFull: 0.9, traderFresh: 0.35, commission: 0.1,
+    // Vision du stock : exigence de prix qui baisse avec le remplissage (de visionFrom à 100 %), réserve de place
+    // pour visionAhead[niveau] s de récoltes à venir, sans dépasser visionKeep du silo.
+    visionFrom: 0.15, visionAhead: [30, 60, 120], visionKeep: 0.85, inflowMemory: 60,
     managerEvery: 45,
     demandEvery: [50, 110], demandLife: 200, demandMax: 3,
     // Les commandes paient à parité avec le légume le plus rentable que tu possèdes : de quoi rendre le blé intéressant.
@@ -878,7 +906,7 @@
   // mold : divise la valeur des plantes voisines ; infinite : grandit sans limite ; catcher : attrape un robot.
   const MUTATIONS = {
     giant: { name: 'Gigantisme', good: true, w: 3, value: 8, harvest: 3, color: '#ff8fff', desc: 'Vaut ×8, mais la récolte prend 3× plus de temps.' },
-    infini: { name: 'Infinie', good: true, w: 1, infinite: true, color: '#7fe3ff', desc: 'Grandit sans limite tant qu\'elle n\'est pas récoltée, et sa valeur avec. Les ouvriers la laissent : clique pour la récolter.' },
+    infini: { name: 'Infinie', good: true, w: 1, infinite: true, autoAt: 300, color: '#7fe3ff', desc: 'Grandit sans limite tant qu\'elle n\'est pas récoltée, et sa valeur avec. Les ouvriers la laissent grandir jusqu\'à ×300, puis la récoltent (ou clique pour la récolter avant).' },
     carnivore: { name: 'Carnivore', good: true, w: 1, value: 2, catcher: true, color: '#ff5e5e', desc: 'Vaut ×2, mais attrape le premier robot qui vient la récolter : un autre ouvrier doit la récolter pour le libérer.' },
     sterile: { name: 'Stérile', w: 3, value: 0, color: '#9aa3ad', desc: 'Ne vaut rien.' },
     febrile: { name: 'Fébrile', w: 3, fail: 0.5, color: '#ff7b6b', desc: '1 chance sur 2 de ne rien donner.' },
@@ -1402,6 +1430,9 @@
     ['sapin', 'Sapin de Noël', 'noel', 'exotique', 'fir', '#1f6a3a', '#e0302a', { mult: 5, grow: 90, desc: 'Très lent, mais il vaut 5× ta meilleure graine.' }],
     ['houx', 'Houx', 'noel', 'baie', 'bush', '#2f7a3a', '#e0302a', { mult: 1.5, grow: 12, desc: 'Rapide et décoratif.' }],
   ];
+  // Graines de saison : achetées à chaque nouvelle saison (débloquées jusqu'à sa fin, même après une renaissance).
+  // Prix = harvests × mult × (valeur de la meilleure graine × multiplicateur de valeur), figé au début de la saison.
+  const SEASON_PRICE = { harvests: 250 };
   const SEASON_SEEDS = SEASON_SEED_LIST.map(([id, name, season, fam, shape, leaf, fruit, o]) => ({
     id, name, season, fam, shape, leaf, fruit, pr: 0, rank: 20, thirst: 1, unlock: 0, value: 0, shelf: FAMILIES[fam].shelf, ...o,
   }));
@@ -1469,9 +1500,10 @@
     { id: 'r10', name: 'Atelier', desc: 'Posséder 10 robots.', check: g => g.robotCount() >= 10 },
     { id: 'r30', name: 'Armée de fer', desc: 'Posséder 30 robots.', check: g => g.robotCount() >= 30 },
     { id: 'r80', name: 'Usine à légumes', desc: 'Posséder 80 robots.', check: g => g.robotCount() >= 80 },
-    { id: 'drone', name: 'Ça vole !', desc: 'Acheter un drone agricole.', check: g => (g.s.robots.drone || 0) >= 1 },
-    { id: 'quant', name: 'Singularité', desc: 'Acheter un androïde quantique.', check: g => (g.s.robots.quantique || 0) >= 1 },
-    { id: 'golem', name: 'Argile vivante', desc: 'Acheter un golem de terre.', check: g => (g.s.robots.golem || 0) >= 1 },
+    { id: 'drone', name: 'Ça vole !', desc: 'Transformer un robot en drone agricole.', check: g => (g.s.robots.drone || 0) >= 1 },
+    { id: 'quant', name: 'Singularité', desc: 'Transformer un robot en androïde quantique.', check: g => (g.s.robots.quantique || 0) >= 1 },
+    { id: 'golem', name: 'Argile vivante', desc: 'Transformer un robot en golem de terre.', check: g => (g.s.robots.golem || 0) >= 1 },
+    { id: 'sylve', name: 'Bout de la chaîne', desc: 'Transformer un robot en esprit de l\'Arbre-monde.', check: g => (g.s.robots.sylve || 0) >= 1 },
     { id: 'ia', name: 'Skynet agricole', desc: 'Acheter une intelligence centrale.', check: g => (g.s.robots.ia || 0) >= 1 },
     { id: 's5', name: 'Collectionneur', desc: 'Débloquer 5 graines.', check: g => g.seedCount() >= 5 },
     { id: 's20', name: 'Grainetier', desc: 'Avoir débloqué 20 graines différentes.', check: g => Object.keys(g.s.everSeeds || {}).length >= 20 },
@@ -1559,11 +1591,11 @@
   }
 
   const DATA = {
-    SEEDS, FAMILIES, ECO, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
+    SEEDS, FAMILIES, ECO, SLOW, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
     BRANCHES, FAST_GROW, TALENTS, SPEC_PENALTY, BIO, SCIENCE, PETS, PET_MOD_DEFAULTS, PET_LEVEL, MASTERY, PERKS, PERK_CATS,
     FACTORY, MACHINES, RECIPES, FACTORY_ROBOTS, PET_FOODS, foodEffect,
-    SEASONS, SEASON_SEEDS, SEASON_DAYS, seasonAt, nextSeasonDates,
-    PRESTIGE, threshold, ACH_BONUS, WEATHER, DAY_LEN, EVENTS, EVENTS_EVERY, EVENT_FX, ACHIEVEMENTS, fmt, fmtTime,
+    SEASONS, SEASON_SEEDS, SEASON_PRICE, SEASON_DAYS, seasonAt, nextSeasonDates,
+    PRESTIGE, threshold, ACH_BONUS, ROBOT_CHAIN, CHAIN_CAP, WEATHER, DAY_LEN, EVENTS, EVENTS_EVERY, EVENT_FX, ACHIEVEMENTS, fmt, fmtTime,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = DATA;
   else root.FARM_DATA = DATA;

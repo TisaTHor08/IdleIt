@@ -43,7 +43,12 @@ function botBuy() {
   }
   // Un spécialiste "botanique" ou "paysan" n'achète que peu de robots.
   const robotCap = branches.includes('meca') || branches.includes('aucune') ? Infinity : branches.includes('bota') ? 3 : 0;
-  for (const r of D.ROBOTS) if ((game.s.robots[r.id] || 0) < Math.min(game.robotMax(r.id), robotCap)) opts.push(['robot', r.id, game.robotCost(r.id)]);
+  for (const r of D.ROBOTS) {
+    if (r.chain) continue; // les rangs supérieurs s'obtiennent en améliorant
+    const have = r.chain === 0 ? game.chainCount() : game.s.robots[r.id] || 0;
+    if (have < Math.min(game.robotMax(r.id), robotCap)) opts.push(['robot', r.id, game.robotCost(r.id)]);
+  }
+  for (const r of D.ROBOT_CHAIN) if ((game.s.robots[r.id] || 0) > 0 && game.chainNext(r.id)) opts.push(['rupgrade', r.id, game.upgradeCost(r.id)]);
   for (const t of D.TALENTS) if (branches.includes(t.branch) && game.tal(t.id) < t.max && game.talReqOk(t.id)) opts.push(['tal', t.id, game.talCost(t.id) * (t.max === 1 ? 0.2 : 0.7)]);
   // Le mécano reste sur les graines rapides (sans payer les graines lentes).
   if (branches.includes('meca')) {

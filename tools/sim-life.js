@@ -14,6 +14,19 @@ if (process.env.UNLR) { D.ECO.unlockR = +process.env.UNLR; D.SEEDS.forEach(sd =>
 if (process.env.VALR) D.SEEDS.forEach(sd => { sd.value = Math.pow(+process.env.VALR, sd.rank); });
 if (process.env.TPOW) for (const t of D.TALENTS) if (t.g > 1) t.g = Math.pow(t.g, +process.env.TPOW);
 if (process.env.RPOW) for (const r of D.ROBOTS) r.g = Math.pow(r.g, +process.env.RPOW);
+if (process.env.CHAINCAP) D.CHAIN_CAP.max = +process.env.CHAINCAP;
+// SLOWOFF=1 : retire les durées allongées / incompressibles des légumes de haut niveau (comparaison).
+if (process.env.SLOWOFF) {
+  const S = D.SLOW, base = D.SEEDS.filter(sd => !sd.season);
+  base.forEach((sd, i) => {
+    if (!sd.minGrow && sd.harv === 1) return;
+    const f = Math.max(0, (i - S.from + 1) / (base.length - S.from)), sk = Math.pow(f, S.pow);
+    const grow0 = Math.round(sd.grow / (1 + S.growMult * sk));
+    const cyc = (gr, mg, mh) => mg + (gr - mg) / S.mRef + mh + 1;
+    sd.value = sd.value * cyc(grow0, 0, 0) / cyc(sd.grow, sd.minGrow, sd.minHarv);
+    sd.grow = grow0; sd.minGrow = 0; sd.minHarv = 0; sd.harv = 1;
+  });
+}
 const CALIB = !!process.env.CALIB;
 const calibHours = p => (+process.env.CALIB_A || 4.5) + (+process.env.CALIB_B || 0.32) * p;
 // Fixe le seuil n° p et en déduit les prix de l'ère suivante (mêmes règles que data.js).
@@ -62,7 +75,8 @@ function botBuy() {
     const weight = u.id === 'epouvantail' ? 3 : u.tab === 'marche' && u.id !== 'licence' && u.id !== 'trader' ? 3 : 1;
     opts.push(['up', u.id, game.upCost(u.id) * weight]);
   }
-  for (const r of D.ROBOTS) if ((game.s.robots[r.id] || 0) < game.robotMax(r.id)) opts.push(['robot', r.id, game.robotCost(r.id)]);
+  for (const r of D.ROBOTS) if (r.chain ? false : r.chain === 0 ? game.chainCount() < game.chainMax() : (game.s.robots[r.id] || 0) < game.robotMax(r.id)) opts.push(['robot', r.id, game.robotCost(r.id)]);
+  for (const r of D.ROBOT_CHAIN) if ((game.s.robots[r.id] || 0) > 0 && game.chainNext(r.id)) opts.push(['rupgrade', r.id, game.upgradeCost(r.id)]);
   for (const t of D.TALENTS) if (['meca', 'science'].includes(t.branch) && game.tal(t.id) < t.max && game.talReqOk(t.id)) opts.push(['tal', t.id, game.talCost(t.id) * (t.max === 1 ? 0.2 : 0.7)]);
   const open = opts.filter(([kind, id]) => kind === 'seed' || kind === 'plot' || !game.quote(kind, id).locked);
   open.sort((a, b) => a[2] - b[2]);

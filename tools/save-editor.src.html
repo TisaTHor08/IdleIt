@@ -230,13 +230,24 @@ function ups(v) {
     v.append(h('h3', {}, name), levelRows(list, u => s.up[u.id] || 0, (u, y) => { if (y) s.up[u.id] = y; else delete s.up[u.id]; }, u => (u.max >= 999 ? '∞' : u.max)));
   }
 }
+// Robots polyvalents (rouillé → chromé → ...) : un plafond commun ; « max normal » les met tous au meilleur rang débloqué.
+function maxRobots(s, prestiges) {
+  const top = D.ROBOT_CHAIN.filter(r => (r.pr || 0) <= prestiges).pop();
+  for (const r of D.ROBOT_CHAIN) delete s.robots[r.id];
+  s.robots[top.id] = D.CHAIN_CAP.max;
+  for (const r of D.ROBOTS) if (r.chain == null) s.robots[r.id] = Math.max(s.robots[r.id] || 0, r.max);
+}
 function robots(v) {
   const s = save;
+  const field = (r, max) => h('div', { class: 'f' }, h('label', {}, r.name, ' ', era(r)),
+    h('input', { type: 'number', min: 0, value: s.robots[r.id] || 0, on: { change: e => { const n = Math.max(0, Math.floor(+e.target.value || 0)); if (n) s.robots[r.id] = n; else delete s.robots[r.id]; } } }),
+    h('span', { class: 'max' }, max));
   v.append(h('h2', {}, 'Robots'), h('p', { class: 'muted' }, 'Aucune limite : la colonne de droite donne le maximum normal du jeu.'),
-    h('div', { class: 'bar' }, h('button', { on: { click: () => { for (const r of D.ROBOTS) s.robots[r.id] = r.max; render(); } } }, 'Tous au max normal')),
-    h('div', { class: 'grid' }, D.ROBOTS.map(r => h('div', { class: 'f' }, h('label', {}, r.name, ' ', era(r)),
-      h('input', { type: 'number', min: 0, value: s.robots[r.id] || 0, on: { change: e => { const n = Math.max(0, Math.floor(+e.target.value || 0)); if (n) s.robots[r.id] = n; else delete s.robots[r.id]; } } }),
-      h('span', { class: 'max' }, '/ ' + r.max)))));
+    h('div', { class: 'bar' }, h('button', { on: { click: () => { maxRobots(s, (s.stats && s.stats.prestiges) || 0); render(); } } }, 'Tous au max normal')),
+    h('h3', {}, `Robots polyvalents (${D.CHAIN_CAP.max} au total, +${D.CHAIN_CAP.perUsine} par niveau du talent Usine)`),
+    h('div', { class: 'grid' }, D.ROBOT_CHAIN.map(r => field(r, 'rang ' + (r.chain + 1)))),
+    h('h3', {}, 'Spécialistes'),
+    h('div', { class: 'grid' }, D.ROBOTS.filter(r => r.chain == null).map(r => field(r, '/ ' + r.max))));
 }
 function tal(v) {
   const s = save;
@@ -366,7 +377,7 @@ $('god').onclick = () => {
   const s = save;
   for (const sd of D.SEEDS) { s.seeds[sd.id] = true; s.everSeeds[sd.id] = true; }
   for (const u of D.UPGRADES) s.up[u.id] = u.max >= 999 ? Math.max(s.up[u.id] || 0, s.plots.length) : u.max;
-  for (const r of D.ROBOTS) s.robots[r.id] = Math.max(s.robots[r.id] || 0, r.max);
+  maxRobots(s, Infinity);
   for (const p of D.PERKS) s.perks[p.id] = p.max;
   for (const a of D.ACHIEVEMENTS) s.ach[a.id] = true;
   s.market.unlocked = true; s.trade.silos = D.MARKET.siloMax;
