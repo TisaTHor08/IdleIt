@@ -314,7 +314,9 @@ function market(v) {
   const s = save, tr = s.trade;
   v.append(h('h2', {}, 'Marché'),
     chk('Marché débloqué', () => s.market.unlocked, x => { s.market.unlocked = x; }),
-    h('div', { class: 'grid' }, num('Silos', () => tr.silos || 0, x => { tr.silos = Math.max(0, Math.min(D.MARKET.siloMax, Math.floor(x))); }, { min: 0, max: D.MARKET.siloMax })),
+    h('div', { class: 'grid' }, num('Silos', () => tr.silos || 0, x => { tr.silos = Math.max(0, Math.min(D.MARKET.siloMax, Math.floor(x))); tr.siloTiers = (tr.siloTiers || []).slice(0, tr.silos); while (tr.siloTiers.length < tr.silos) tr.siloTiers.push(0); }, { min: 0, max: D.MARKET.siloMax }),
+      h('label', {}, 'Niveau des silos', h('select', { on: { change: e => { tr.siloTiers = Array(tr.silos || 0).fill(+e.target.value); } } },
+        D.SILO_TIERS.map((t, k) => h('option', { value: k, selected: (tr.siloTiers || [])[0] === k || (!(tr.siloTiers || []).length && !k) }, t.name + ' (×' + t.mult + ')'))))),
     h('h3', {}, 'Stock des silos'),
     h('div', { class: 'bar' },
       h('button', { on: { click: () => { tr.stock = {}; render(); } } }, 'Vider les silos'),
@@ -380,7 +382,7 @@ $('god').onclick = () => {
   maxRobots(s, Infinity);
   for (const p of D.PERKS) s.perks[p.id] = p.max;
   for (const a of D.ACHIEVEMENTS) s.ach[a.id] = true;
-  s.market.unlocked = true; s.trade.silos = D.MARKET.siloMax;
+  s.market.unlocked = true; s.trade.silos = D.MARKET.siloMax; s.trade.siloTiers = Array(D.MARKET.siloMax).fill(D.SILO_TIERS.length - 1);
   for (const p of s.pets.list) maxPet(p);
   status('Tout est débloqué.');
   render();

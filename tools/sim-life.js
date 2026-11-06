@@ -70,6 +70,7 @@ function botBuy() {
   if (game.s.plots.length < game.maxPlots) opts.push(['plot', null, game.plotCost()]);
   if (!process.env.NODENSE) for (let t = 1; t < D.DENSE.length; t++) if (game.tierCount(t - 1) >= 3) opts.push(['merge', t, game.mergeCost(t)]);
   if (game.marketOn() && game.s.trade.silos < D.MARKET.siloMax) opts.push(['silo', null, game.siloCost() * 0.5]);
+  if (game.marketOn()) for (let t = 1; t < D.SILO_TIERS.length; t++) if (game.siloTierCount(t - 1) >= 3 && game.s.trade.silos >= D.MARKET.siloMax) opts.push(['smerge', t, game.siloMergeCost(t)]);
   for (const u of D.UPGRADES) {
     if (game.lvl(u.id) >= game.upMax(u.id) || u.cosmetic) continue;
     const weight = u.id === 'epouvantail' ? 3 : u.tab === 'marche' && u.id !== 'licence' && u.id !== 'trader' ? 3 : 1;

@@ -12,10 +12,33 @@
 
     Object.assign(G, {
       marketOn() { return this.lvl('licence') > 0; },
-      siloCapacity() { return this.s.trade.silos * M.siloCap * (1 + 0.5 * this.lvl('silo_cap')); },
+      // Silos fusionnés : chaque silo a un niveau (D.SILO_TIERS) qui multiplie sa capacité.
+      siloTier(k) { return (this.s.trade.siloTiers && this.s.trade.siloTiers[k]) || 0; },
+      siloTierCount(t) { let n = 0; for (let k = 0; k < this.s.trade.silos; k++) if (this.siloTier(k) === t) n++; return n; },
+      siloEquiv() { let n = 0; for (let k = 0; k < this.s.trade.silos; k++) n += D.SILO_TIERS[this.siloTier(k)].mult; return n; },
+      oneSiloCap(k) { return D.SILO_TIERS[this.siloTier(k)].mult * M.siloCap * (1 + 0.5 * this.lvl('silo_cap')); },
+      siloCapacity() { return this.siloEquiv() * M.siloCap * (1 + 0.5 * this.lvl('silo_cap')); },
       stockUnits() { let n = 0; for (const e of Object.values(this.s.trade.stock)) n += e.units; return n; },
       stockWorth() { let v = 0; for (const e of Object.values(this.s.trade.stock)) v += e.units * e.worth * e.fresh * this.priceFactor(e, e.units); return v; },
-      siloCost(n = this.s.trade.silos) { return M.siloCost * Math.pow(M.siloG, n) * this.discount(); },
+      // Prix du prochain silo selon le total de silos équivalents (comme les parcelles) : fusionner ne rend pas les silos moins chers.
+      siloCost(n = this.s.trade.silos) {
+        const e = this.siloEquiv() + n - this.s.trade.silos;
+        return M.siloCost * Math.pow(M.siloG, Math.min(e, M.siloMax)) * Math.pow(M.siloEquivG, Math.max(0, e - M.siloMax)) * this.discount();
+      },
+      siloMergeCost(t, k = this.siloTierCount(t)) { const T = D.SILO_TIERS[t]; return T.costMult * this.siloCost() * Math.pow(T.g, k); },
+      // Fusionne 3 silos du niveau t-1 en un silo de niveau t (le stock, commun à tous les silos, ne bouge pas).
+      mergeSilos(t) {
+        const tr = this.s.trade;
+        if (!tr.siloTiers) tr.siloTiers = [];
+        while (tr.siloTiers.length < tr.silos) tr.siloTiers.push(0);
+        let left = 3;
+        const kept = tr.siloTiers.filter(x => { if (x === t - 1 && left > 0) { left--; return false; } return true; });
+        if (left > 0) return false;
+        tr.siloTiers = kept.concat(t).sort((a, b) => b - a);
+        tr.silos = tr.siloTiers.length;
+        this.emit('silo-merge', { tier: t });
+        return true;
+      },
 
       // Unités absorbées par le marché avant que le prix ne chute (les OGM en produisent beaucoup plus).
       marketDepth(seedId) {
@@ -175,6 +198,10 @@
         for (const k of Object.keys(this.s.trade.stock)) t += this.sellStock(k, 1, commission);
         return t;
       },
+      traderEvery() {
+        const l = this.lvl('trader_vif'), [k, a, b] = M.traderVif;
+        return Math.max(M.traderMinEvery, M.traderEvery - a * Math.min(l, k) - b * Math.max(0, l - k));
+      },
       traderCommission() { return Math.max(0, M.commission - 0.02 * this.lvl('trader_comm') - 0.02 * this.perk('negociant')); },
 
       // ---------- Boucle du marché ----------
@@ -217,7 +244,7 @@
         if (tr.demandT <= 0) { tr.demandT = rand(M.demandEvery[0], M.demandEvery[1]); if (tr.demands.length < this.demandCap()) this.newDemand(); }
         if (this.lvl('trader')) {
           tr.traderT -= dt;
-          if (tr.traderT <= 0) { tr.traderT = Math.max(2, M.traderEvery - this.lvl('trader_vif')); this.traderAct(); }
+          if (tr.traderT <= 0) { tr.traderT = this.traderEvery(); this.traderAct(); }
         }
         if (this.lvl('gestion')) {
           tr.managerT -= dt;
@@ -287,16 +314,34 @@
         }
       },
 
+      // Plante infinie : elle rapporte au rythme de sa propre graine. Si la graine prévue sur sa parcelle (au cours
+      // actuel, commandes comprises) rapporte nettement plus, le gestionnaire la fait récolter (même avant ×300) pour replanter.
+      managerScore(sd, traits = this.produceTraits()) {
+        const d = this.demandFor({ seed: sd.id, traits });
+        return this.seedRate(sd) * this.seedPrice(sd.id) * (d ? d.mult : 1);
+      },
+      managerRenew() {
+        const traits = this.produceTraits();
+        for (let i = 0; i < this.activePlots(); i++) {
+          const c = this.s.plots[i].crop;
+          if (!c || c.mutant !== 'infini' || c.p < 1 || c.renew) continue;
+          const now = SEED_BY_ID[c.id], next = SEED_BY_ID[this.seedFor(i)];
+          if (!next || next.id === now.id) continue;
+          if (this.managerScore(next, traits) >= this.managerScore(now, traits) * M.infiniRenew) { c.renew = true; this.emit('infini-renew', { plot: i }); }
+        }
+      },
+
       // Le gestionnaire choisit les deux graines les plus rentables au cours actuel (60 % / 40 %, sous le seuil d'épidémie).
       managerAct() {
+        this.managerAssign();
+        this.managerRenew(); // après l'attribution : compare chaque infinie à la graine qui vient d'être prévue
+      },
+      managerAssign() {
         const n = this.activePlots();
         const managed = Math.floor(n * Math.min(1, 0.25 * (1 + this.lvl('gestion_part'))));
         if (!managed) return;
         const traits = this.produceTraits();
-        const scored = D.SEEDS.filter(sd => this.s.seeds[sd.id]).map(sd => {
-          const d = this.demandFor({ seed: sd.id, traits });
-          return { id: sd.id, score: this.seedRate(sd) * this.seedPrice(sd.id) * (d ? d.mult : 1) };
-        }).sort((a, b) => b.score - a.score);
+        const scored = D.SEEDS.filter(sd => this.s.seeds[sd.id]).map(sd => ({ id: sd.id, score: this.managerScore(sd, traits) })).sort((a, b) => b.score - a.score);
         if (!scored.length) return;
         const second = scored[1] || scored[0];
         // Mélange seulement si la 2e graine est presque aussi rentable, ou en Science (risque d'épidémie).

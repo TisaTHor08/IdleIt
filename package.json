@@ -1,7 +1,7 @@
 {
   "name": "idleit",
   "productName": "Farmling",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Idle game de ferme miniature qui vit au-dessus de la barre des tâches.",
   "main": "src/main.js",
   "author": "TisaTHor08",

@@ -519,15 +519,19 @@
   }
 
   // Silo de profil : cylindre, dôme, niveau de grain visible par une fente.
-  function drawSilo(ctx, x, ground, fill, t) {
-    px(ctx, x, ground - 15, 7, 15, '#aeb7c1');
-    for (let y = ground - 13; y < ground; y += 3) px(ctx, x, y, 7, 1, '#8f99a4');
-    px(ctx, x + 1, ground - 17, 5, 2, '#8f99a4');
-    px(ctx, x + 2, ground - 18, 3, 1, '#77818c');
-    px(ctx, x + 3, ground - 14, 1, 13, '#3b4249');
-    const h = Math.round(fill * 13);
+  // Silo : plus haut à chaque fusion (+2 px par niveau), cerclé de la couleur de son niveau.
+  const SILO_RING = [null, '#7ee081', '#ffd84a', '#c77dff', '#ff8f5a'];
+  function drawSilo(ctx, x, ground, fill, t, tier = 0) {
+    const H = 15 + 2 * tier, top = ground - H;
+    px(ctx, x, top, 7, H, '#aeb7c1');
+    for (let y = top + 2; y < ground; y += 3) px(ctx, x, y, 7, 1, '#8f99a4');
+    px(ctx, x + 1, top - 2, 5, 2, '#8f99a4');
+    px(ctx, x + 2, top - 3, 3, 1, '#77818c');
+    if (tier) { const c = SILO_RING[Math.min(tier, SILO_RING.length - 1)]; px(ctx, x, top + 1, 7, 1, c); if (tier >= 3) px(ctx, x, ground - 3, 7, 1, c); }
+    px(ctx, x + 3, top + 1, 1, H - 2, '#3b4249');
+    const h = Math.round(fill * (H - 2));
     if (h) px(ctx, x + 3, ground - 1 - h, 1, h, fill >= 1 ? '#ffb347' : '#e8c15a');
-    if (fill >= 1 && Math.floor(t * 2) % 2) px(ctx, x + 3, ground - 16, 1, 1, '#ff5e5e');
+    if (fill >= 1 && Math.floor(t * 2) % 2) px(ctx, x + 3, top - 1, 1, 1, '#ff5e5e');
   }
 
   // Détails des mutations par-dessus la plante.

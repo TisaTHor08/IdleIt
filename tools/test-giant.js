@@ -16,7 +16,7 @@ const w = g.workers[0];
 // Tirage à la plantation : uniquement en Science, réparti selon les poids.
 const counts = {};
 const r0 = Math.random;
-for (let k = 0; k < 20000; k++) { const m = g.rollMutation(); if (m) counts[m] = (counts[m] || 0) + 1; }
+for (let k = 0; k < 400000; k++) { const m = g.rollMutation(); if (m) counts[m] = (counts[m] || 0) + 1; }
 assert.ok(Object.keys(counts).length === Object.keys(D.MUTATIONS).length, 'toutes les mutations sortent : ' + JSON.stringify(counts));
 
 crop(0, null); const base = value(0);

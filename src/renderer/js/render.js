@@ -239,12 +239,12 @@
 
       if (g.s.trade.silos) {
         // Le stock est commun : on remplit les silos l'un après l'autre.
-        const cap = g.siloCapacity() / g.s.trade.silos;
         let left = g.stockUnits();
         for (let k = 0; k < g.s.trade.silos; k++) {
+          const cap = g.oneSiloCap(k);
           const fill = Math.max(0, Math.min(1, left / cap));
           left -= cap;
-          S.drawSilo(ctx, this.siloX0() + k * C.SILO.STEP, GROUND, fill, t);
+          S.drawSilo(ctx, this.siloX0() + k * C.SILO.STEP, GROUND, fill, t, g.siloTier(k));
         }
       }
     }

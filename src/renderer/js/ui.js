@@ -476,10 +476,21 @@
           desc: u.desc + (req ? ` <span style="color:var(--bad)">Requiert : ${req}</span>` : ''), locked: !g.upReqOk(u.id), buttons: [this.buyButton('up', u.id)],
         };
       });
-      items.splice(1, 0, {
-        key: 'silo', icon: S.iconURL('market', 3), title: 'Silo', level: `${g.s.trade.silos} / ${D.MARKET.siloMax}`,
-        desc: `Stocke ${fmt(D.MARKET.siloCap * (1 + 0.5 * g.lvl('silo_cap')))} unités de récolte.`, locked: !g.marketOn(), buttons: [this.buyButton('silo', null, 'Construire')],
-      });
+      const silos = [{
+        key: 'silo', icon: S.iconURL('market', 3), title: 'Silo', level: `${g.s.trade.silos} / ${D.MARKET.siloMax} emplacements`,
+        desc: `Stocke ${fmt(D.MARKET.siloCap * (1 + 0.5 * g.lvl('silo_cap')))} unités de récolte. Capacité totale : ${fmt(g.siloCapacity())} unités (${fmt(g.siloEquiv())} silos équivalents).`, locked: !g.marketOn(), buttons: [this.buyButton('silo', null, 'Construire')],
+      }];
+      // Fusion des silos : on n'affiche un niveau que si le précédent existe.
+      for (let t = 1; t < D.SILO_TIERS.length; t++) {
+        const T = D.SILO_TIERS[t], prev = D.SILO_TIERS[t - 1];
+        if (!g.marketOn() || (t > 1 && !g.siloTierCount(t - 1) && !g.siloTierCount(t))) break;
+        silos.push({
+          key: 'smerge-' + T.id, icon: S.iconURL('market', 3), title: T.name, level: `${g.siloTierCount(t)} silo(s) · ×${T.mult}`,
+          desc: T.desc + ' Libère 2 emplacements pour construire d’autres silos.' + (g.siloTierCount(t - 1) < 3 ? ` <span style="color:var(--bad)">Requiert 3 × ${prev.name.toLowerCase()} (${g.siloTierCount(t - 1)})</span>` : ''),
+          locked: g.siloTierCount(t - 1) < 3, buttons: [this.buyButton('smerge', t, 'Fusionner')],
+        });
+      }
+      items.splice(1, 0, ...silos);
       return items;
     }
 
@@ -1091,6 +1102,7 @@
           case 'energy-harvest': this.toast('Récolte énergisée !', 'gold'); break;
           case 'energy-lost': r.addFx('smoke', C.plotX(e.plot)); this.toast('Trop tard : la plante énergisée a grillé.', null, 'elost'); break;
           case 'crow-zap': r.addFloater(e.x, '!', '#c77dff', true); break;
+          case 'silo-merge': this.toast(`${D.SILO_TIERS[e.tier].name} construit : ${D.SILO_TIERS[e.tier].mult}× la capacité d’un silo !`, 'gold'); break;
           case 'merge': this.toast(`${D.DENSE[e.tier].name} créée : ${D.DENSE[e.tier].plants} plants sur une seule parcelle !`, 'gold'); break;
           case 'pet-path': { const pet = g.petByUid(e.uid); this.toast(`Nouvelle voie : ${pet ? g.petName(pet) : ''} !`, 'gold'); break; }
           case 'event': { const ev = D.EVENTS[e.id]; this.toast(`${ev.name} : ${ev.desc}`, ev.good ? 'gold' : null); break; }

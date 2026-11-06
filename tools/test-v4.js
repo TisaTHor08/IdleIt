@@ -76,4 +76,16 @@ b.startEvent('sanglier'); run(b, 1); b.scareBoar(); run(b, 10);
 assert.ok(!b.ev.boar, 'sanglier parti');
 b.startEvent('voleur'); run(b, 1); b.catchThief(); assert.ok(b.s.stats.thieves === 1, 'voleur attrapé'); run(b, 10);
 assert.ok(!b.ev.thief, 'voleur enfui');
+// Mémoire animale : 10 % de l'XP gardée par niveau, plafonnée au niveau max hors maîtrise.
+{
+  const m = new Game(null);
+  m.s.money = 1e12; m.adoptPet('poussin');
+  m.s.perks.souvenir = 3;
+  m.s.pets.list[0].xp = 1000; m.s.runEarned = 1e30;
+  assert.ok(m.prestige(), 'renaissance');
+  assert.ok(Math.abs(m.s.pets.list[0].xp - 300) < 1e-6, 'garde 30 % : ' + m.s.pets.list[0].xp);
+  m.s.pets.list[0].xp = 1e300; m.s.runEarned = 1e40; m.prestige();
+  assert.strictEqual(m.petLevel(m.s.pets.list[0]), D.PET_LEVEL.max, 'plafonné au niveau max');
+  console.log('mémoire animale : OK');
+}
 console.log('v4 : OK');

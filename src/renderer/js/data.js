@@ -244,9 +244,9 @@
     { id: 'trader', tab: 'marche', name: 'Embaucher un trader', desc: 'Vend automatiquement quand le cours est bon, quand ça va pourrir ou quand les silos débordent (commission 10%).', base: 3e6, g: 1, max: 1, req: { licence: 1 } },
     { id: 'trader_comm', tab: 'marche', name: 'Trader : négociation', desc: 'Commission -2%.', base: 2e6, g: 3, max: 5, req: { trader: 1 } },
     { id: 'trader_lots', tab: 'marche', name: 'Trader : ventes fractionnées', desc: 'Vend par plus petits lots pour moins faire baisser les prix.', base: 4e6, g: 3, max: 4, req: { trader: 1 } },
-    { id: 'trader_vif', tab: 'marche', name: 'Trader : réactivité', desc: 'Surveille les cours plus souvent.', base: 1.5e6, g: 2.5, max: 5, req: { trader: 1 } },
+    { id: 'trader_vif', tab: 'marche', name: 'Trader : réactivité', desc: 'Surveille les cours et vend plus souvent : 8 s entre deux passages au départ, -1 s par niveau jusqu’au niveau 5, puis -0,2 s par niveau (toutes les 2 s au niveau max).', base: 1.5e6, g: 2.5, max: 10, req: { trader: 1 } },
     { id: 'trader_vision', tab: 'marche', name: 'Trader : vision du stock', desc: 'Le trader suit le remplissage des silos et ce qui arrive des champs : plus les silos se remplissent, moins il est exigeant sur le prix, et il vend à l\'avance pour garder de la place. Chaque niveau anticipe plus loin.', base: 5e6, g: 3, max: 3, req: { trader: 1 } },
-    { id: 'gestion', tab: 'marche', name: 'Embaucher un gestionnaire', desc: 'Choisit les graines des parcelles selon les cours et les commandes (sans dépasser le seuil d\'épidémie).', base: 2e7, g: 1, max: 1, req: { trader: 1 } },
+    { id: 'gestion', tab: 'marche', name: 'Embaucher un gestionnaire', desc: 'Choisit les graines des parcelles selon les cours et les commandes (sans dépasser le seuil d\'épidémie). Fait aussi récolter une plante infinie quand la replanter avec une graine plus rentable rapporte plus.', base: 2e7, g: 1, max: 1, req: { trader: 1 } },
     { id: 'gestion_part', tab: 'marche', name: 'Gestionnaire : délégation', desc: 'Il gère 25% du champ de plus (25% au départ).', base: 1e7, g: 3, max: 3, req: { gestion: 1 } },
   ];
 
@@ -257,6 +257,7 @@
     surplus: 0.75,        // prix du marché classique, fixe
     premium: 1.25,        // le marché paie 25% de plus que le prix de référence (avant cours et saturation)
     siloCost: 4e5, siloG: 2.2, siloMax: 8, siloCap: 150, // capacité d'un silo, en unités
+    siloEquivG: 1.1,      // au-delà de siloMax silos équivalents (fusions), chaque silo équivalent de plus coûte ×1.1
     trendStep: 5, trendVol: [0.04, 0.16], trendPull: 0.035, trendMin: 0.25, trendMax: [2, 10], // [légume le plus cher, le moins cher]
     depth: 40, depthPerPlot: 3, memory: 90, // unités absorbées sans chute de prix ; oubli en ~90 s
     depthTier: 6, depthSlope: 1.5, depthMin: 0.25,
@@ -264,6 +265,8 @@
     traderEvery: 8, traderTarget: 1.05, traderBusy: 0.3, traderBusyTarget: 0.9, traderFull: 0.9, traderFresh: 0.35, commission: 0.1,
     // Vision du stock : exigence de prix qui baisse avec le remplissage (de visionFrom à 100 %), réserve de place
     // pour visionAhead[niveau] s de récoltes à venir, sans dépasser visionKeep du silo.
+    traderVif: [5, 1, 0.2], traderMinEvery: 2, // réactivité : -1 s par niveau jusqu'au niveau 5, puis -0,2 s ; jamais moins de 2 s
+    infiniRenew: 1.15, // le gestionnaire fait récolter une infinie si la graine prévue sur sa parcelle rapporte 15 % de plus
     visionFrom: 0.15, visionAhead: [30, 60, 120], visionKeep: 0.85, inflowMemory: 60,
     managerEvery: 45,
     demandEvery: [50, 110], demandLife: 200, demandMax: 3,
@@ -288,6 +291,20 @@
   };
 
   const PLOTS = { start: 3, base: 10, g: 1.33 };
+
+  // Silos fusionnés (même principe que les cultures denses) : 3 silos d'un niveau en donnent un du niveau suivant,
+  // qui stocke 3× plus sur un seul emplacement. On libère ainsi de la place pour construire d'autres silos.
+  const SILO_TIERS = [
+    { id: 'silo', name: 'Silo', mult: 1 },
+    { id: 'grand', name: 'Grand silo', mult: 3, costMult: 8, g: 1.3, color: '#7ee081',
+      desc: 'Fusionne 3 silos en un grand silo : 3× la capacité sur un seul emplacement.' },
+    { id: 'geant', name: 'Silo géant', mult: 9, costMult: 40, g: 1.35, color: '#ffd84a',
+      desc: 'Fusionne 3 grands silos en un silo géant : 9× la capacité d’un silo.' },
+    { id: 'mega', name: 'Méga-silo', mult: 27, costMult: 200, g: 1.4, color: '#c77dff',
+      desc: 'Fusionne 3 silos géants en un méga-silo : 27× la capacité d’un silo.' },
+    { id: 'tour', name: 'Silo-tour', mult: 81, costMult: 1000, g: 1.45, color: '#ff8f5a',
+      desc: 'Fusionne 3 méga-silos en une silo-tour : 81× la capacité d’un silo.' },
+  ];
 
   // Cultures denses : un achat fusionne 3 parcelles du niveau précédent en une seule qui produit pour tous ses plants.
   // Gain de place uniquement : planter/récolter, eau et chance de doré suivent le nombre de plants.
@@ -906,7 +923,7 @@
   // mold : divise la valeur des plantes voisines ; infinite : grandit sans limite ; catcher : attrape un robot.
   const MUTATIONS = {
     giant: { name: 'Gigantisme', good: true, w: 3, value: 8, harvest: 3, color: '#ff8fff', desc: 'Vaut ×8, mais la récolte prend 3× plus de temps.' },
-    infini: { name: 'Infinie', good: true, w: 1, infinite: true, autoAt: 300, color: '#7fe3ff', desc: 'Grandit sans limite tant qu\'elle n\'est pas récoltée, et sa valeur avec. Les ouvriers la laissent grandir jusqu\'à ×300, puis la récoltent (ou clique pour la récolter avant).' },
+    infini: { name: 'Infinie', good: true, w: 0.04, infinite: true, autoAt: 300, color: '#7fe3ff', desc: 'Grandit sans limite tant qu\'elle n\'est pas récoltée, et sa valeur avec. Les ouvriers la laissent grandir jusqu\'à ×300, puis la récoltent (ou clique pour la récolter avant).' },
     carnivore: { name: 'Carnivore', good: true, w: 1, value: 2, catcher: true, color: '#ff5e5e', desc: 'Vaut ×2, mais attrape le premier robot qui vient la récolter : un autre ouvrier doit la récolter pour le libérer.' },
     sterile: { name: 'Stérile', w: 3, value: 0, color: '#9aa3ad', desc: 'Ne vaut rien.' },
     febrile: { name: 'Fébrile', w: 3, fail: 0.5, color: '#ff7b6b', desc: '1 chance sur 2 de ne rien donner.' },
@@ -943,6 +960,7 @@
     { id: 'or', cat: 'nature', name: 'Doigts d\'or', desc: '+0.25% de chance de légume doré.', base: 3, g: 1.7, max: 8, fx: [{ k: 'gold', add: 0.0025 }] },
     { id: 'chasseur', cat: 'nature', name: 'Chasseur', desc: 'Corbeaux, sangliers et voleurs chassés rapportent ×1.5.', base: 2, g: 2, max: 4 },
     { id: 'dresseur', cat: 'compagnons', name: 'Dresseur', desc: 'Compagnons +20% d\'XP.', base: 2, g: 1.8, max: 6, fx: [{ k: 'petXp', mult: 1.2 }] },
+    { id: 'souvenir', cat: 'compagnons', name: 'Mémoire animale', desc: 'À la renaissance, tes compagnons gardent 10% de leur XP par niveau (jusqu’à 60%) : ils repartent avec quelques niveaux d’avance. Les points de compétence sont à replacer.', base: 3, g: 2, max: 6 },
     { id: 'eleveur', cat: 'compagnons', name: 'Éleveur', desc: 'Adoptions 40% moins chères.', base: 2, g: 2, max: 3, fx: [{ k: 'petCost', mult: 0.6 }] },
     { id: 'negociant', cat: 'commerce', name: 'Négociant', desc: 'Marchand ambulant +50% et commission du trader -2%.', base: 2, g: 1.9, max: 5 },
     { id: 'frigo', cat: 'commerce', name: 'Frigo de famille', desc: 'Les légumes se gardent 12% plus longtemps.', base: 2, g: 1.8, max: 6, fx: [{ k: 'spoil', mult: 0.88 }] },
@@ -1545,6 +1563,7 @@
     { id: 'shortage', name: 'Spéculateur', desc: 'Vendre pendant une pénurie.', check: g => count(g, 'shortageSales') >= 1 },
     { id: 'rotten', name: 'Ça sent pas bon', desc: 'Laisser pourrir un lot au silo.', check: g => count(g, 'rotten') >= 1 },
     { id: 'silo8', name: 'Coopérative', desc: 'Posséder 8 silos.', check: g => g.s.trade.silos >= 8 },
+    { id: 'silotour', name: 'Grenier du monde', desc: 'Construire une silo-tour.', check: g => g.siloTierCount(SILO_TIERS.length - 1) >= 1 },
     { id: 'energy1', name: 'Coup de foudre', desc: 'Récolter une plante dorée énergisée.', check: g => count(g, 'energized') >= 1 },
     { id: 'cursed1', name: 'Oiseau de malheur', desc: 'Voir un corbeau frappé par la foudre.', check: g => count(g, 'cursedCrows') >= 1 },
     { id: 'super1', name: 'Survolté', desc: 'Un robot paratonnerre foudroyé.', check: g => count(g, 'superRobots') >= 1 },
@@ -1591,7 +1610,7 @@
   }
 
   const DATA = {
-    SEEDS, FAMILIES, ECO, SLOW, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
+    SILO_TIERS, SEEDS, FAMILIES, ECO, SLOW, FARMER, ROBOTS, ACTIONS, STORM, BATTERY, UPGRADES, DENSE, MINI, MUTATIONS, MARKET, TRAITS, PLOTS,
     BRANCHES, FAST_GROW, TALENTS, SPEC_PENALTY, BIO, SCIENCE, PETS, PET_MOD_DEFAULTS, PET_LEVEL, MASTERY, PERKS, PERK_CATS,
     FACTORY, MACHINES, RECIPES, FACTORY_ROBOTS, PET_FOODS, foodEffect,
     SEASONS, SEASON_SEEDS, SEASON_PRICE, SEASON_DAYS, seasonAt, nextSeasonDates,

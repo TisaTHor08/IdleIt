@@ -12,7 +12,7 @@ Une bande de 40 px, transparente et toujours au premier plan : un fermier, des r
 - Une **usine de transformation** (fin de partie) : 6 machines, 17 recettes, tapis, robots, frigos, trader et gestionnaire
 - **16 gamelles** pour les compagnons et **180 effets spéciaux** (chaque compagnon, dans chaque état, en a un pour chaque gamelle)
 - Ultra sobre : environ **2 % d'un cœur** et 250 Mo, rendu en 5 à 15 images/s au choix
-- 32 talents de renaissance, 86 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
+- 33 talents de renaissance, 87 succès, une durée de vie d'environ **160 h** jusqu'à l'Arbre-monde (première renaissance vers 5 h, parties de plus en plus longues ensuite)
 - Sauvegarde 100 % automatique, compatible avec un dossier synchronisé (NAS, cloud)
 
 ---
@@ -96,8 +96,10 @@ Dès 10 M$ gagnés dans une partie, le marché ouvre. Les récoltes partent dans
 
 - Les **cours** bougent sans cesse, plus fort sur les légumes bon marché. Des **pénuries** (cours ×6 à ×25) et des **krachs** frappent au hasard.
 - Les **commandes** (bio, sans OGM, résistant au froid…) paient à parité avec ton meilleur légume : de quoi rendre le blé ou les carottes rentables en fin de partie. Le prix reste plafonné à 3× la rentabilité de ton meilleur légume.
+- Les **silos se fusionnent** comme les champs : 3 silos donnent un grand silo (×3), puis silo géant (×9), méga-silo (×27) et silo-tour (×81), chacun sur un seul emplacement. On libère ainsi de la place pour en construire d'autres, jusqu'à 8 silos-tours.
 - Les légumes **géants** et **infinis** remplissent plus les silos : une géante donne 8 unités, une infinie autant d'unités que son multiplicateur.
-- Le trader peut apprendre la **vision du stock** : plus les silos se remplissent, moins il est exigeant sur le prix, et il vend à l'avance pour garder la place des récoltes qui arrivent.
+- Le trader peut apprendre la **vision du stock** : plus les silos se remplissent, moins il est exigeant sur le prix, et il vend à l'avance pour garder la place des récoltes qui arrivent. Sa **réactivité** monte jusqu'au niveau 10 : il passe alors toutes les 2 s (8 s au départ).
+- Le **gestionnaire** fait aussi récolter une plante infinie (même avant ×300) quand la graine prévue sur sa parcelle rapporte nettement plus : on renouvelle la graine pour gagner plus.
 - Les **légumes dorés** sont un produit à part, avec leur propre cours (plus nerveux), et certaines recettes de l'usine en demandent.
 - Les produits **s'abîment** : la salade et les champignons pourrissent vite, le blé et les pommes de terre se gardent des heures. Chambre froide et conserverie ralentissent l'usure, et un voleur peut s'en prendre à tes silos.
 
@@ -195,7 +197,7 @@ Les graines d'or sont rares : aller bien au-delà du seuil en rapporte un peu pl
 
 ### Succès et réglages
 
-86 succès, chacun +2 % de revenus. Dans les **réglages** : écran, taille, opacité, **animation** (60, 30, 15, 10 ou 5 images/s : moins d'images = moins de processeur, le jeu avance pareil), lancement au démarrage de Windows, raccourci clavier, dossier de sauvegarde.
+87 succès, chacun +2 % de revenus. Dans les **réglages** : écran, taille, opacité, **animation** (60, 30, 15, 10 ou 5 images/s : moins d'images = moins de processeur, le jeu avance pareil), lancement au démarrage de Windows, raccourci clavier, dossier de sauvegarde.
 
 Le jeu est conçu pour tourner toute la journée : simulation à 5 Hz, décor redessiné 4 fois par seconde, sprites mis en cache, canvas limité à la partie dessinée, rendu en pause quand la ferme est masquée, pas d'accélération GPU. Mesuré : environ 2 % d'un cœur et 250 Mo.
 

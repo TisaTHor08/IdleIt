@@ -438,8 +438,13 @@
       },
 
       // Renaissance : on garde les animaux (et les emplacements), mais ils reviennent au niveau 0.
+      // Mémoire animale : une part de l'XP est gardée, sans dépasser le niveau max hors maîtrise (la voie est à rechoisir).
+      petXpKept() { return Math.min(1, 0.1 * this.perk('souvenir')); },
       resetPetsForPrestige() {
-        for (const pet of this.s.pets.list) { pet.xp = 0; pet.nodes = {}; pet.path = null; pet.mastery = {}; } // la gamelle reste équipée
+        const keep = this.petXpKept();
+        let cap = 0;
+        for (let l = 0; l < D.PET_LEVEL.max; l++) cap += this.petXpFor(l);
+        for (const pet of this.s.pets.list) { pet.xp = Math.min(cap * (1 + 1e-9), (pet.xp || 0) * keep); pet.nodes = {}; pet.path = null; pet.mastery = {}; } // la gamelle reste équipée
         this.petRt = {};
       },
     });

@@ -28,7 +28,7 @@
   const plotX = i => LAYOUT.BARN_W + LAYOUT.PAD + i * LAYOUT.PLOT_STEP + LAYOUT.PLOT_W / 2;
 
   function defaultTrade() {
-    return { silos: 0, stock: {}, trend: {}, sold: {}, made: {}, demands: [], shocks: [], trendT: 0, demandT: 45, shockT: 120, traderT: 0, managerT: 5 };
+    return { silos: 0, siloTiers: [], stock: {}, trend: {}, sold: {}, made: {}, demands: [], shocks: [], trendT: 0, demandT: 45, shockT: 120, traderT: 0, managerT: 5 };
   }
 
   // Usine : remise à zéro à la renaissance (la nourriture des compagnons, elle, est gardée dans s.pantry).
@@ -106,6 +106,8 @@
       s.market = { ...def.market, ...(data.market || {}) };
       const tr = { ...defaultTrade(), ...(data.trade || {}) };
       tr.silos = Math.min(D.MARKET.siloMax, +tr.silos || 0);
+      // Un niveau par silo (anciennes parties : tous de niveau 0), du plus gros au plus petit.
+      tr.siloTiers = Array.from({ length: tr.silos }, (_, k) => Math.max(0, Math.min(D.SILO_TIERS.length - 1, (Array.isArray(tr.siloTiers) ? tr.siloTiers[k] : 0) | 0))).sort((a, b) => b - a);
       tr.stock = Object.fromEntries(Object.entries(tr.stock || {}).filter(([, e]) => e && SEED_BY_ID[e.seed] && e.units > 0)
         .map(([k, e]) => [k, { seed: e.seed, traits: Array.isArray(e.traits) ? e.traits : [], units: +e.units, worth: +e.worth || 0, fresh: e.fresh == null ? 1 : +e.fresh }]));
       tr.demands = (Array.isArray(tr.demands) ? tr.demands : []).filter(d => d && SEED_BY_ID[d.seed] && D.TRAITS[d.trait]);
@@ -433,6 +435,7 @@
           return { level: lvl, max: next ? lvl + (this.s.robots[id] || 0) : 0, cost: k => this.upgradeCost(id, k) };
         }
         case 'plot': return { level: this.s.plots.length, max: this.maxPlots, cost: k => this.plotCost(this.plotEquiv() + k - this.s.plots.length) };
+        case 'smerge': { const t = +id, lvl = this.siloTierCount(t); return { level: lvl, max: lvl + Math.floor(this.siloTierCount(t - 1) / 3), cost: k => this.siloMergeCost(t, k) }; }
         case 'merge': { const t = +id, lvl = this.tierCount(t); return { level: lvl, max: lvl + Math.floor(this.tierCount(t - 1) / 3), cost: k => this.mergeCost(t, k) }; }
         case 'seed': return { level: this.s.seeds[id] ? 1 : 0, max: 1, cost: () => this.seedCost(id) };
         case 'tal': return { level: this.tal(id), max: TAL_BY_ID[id].max, cost: k => this.talCost(id, k) };
@@ -446,7 +449,7 @@
     locked(kind, id) {
       if (kind === 'tal') return this.branchLocked(TAL_BY_ID[id].branch) || !this.talReqOk(id);
       if (kind === 'up') return !this.upReqOk(id);
-      if (kind === 'silo') return !this.marketOn();
+      if (kind === 'silo' || kind === 'smerge') return !this.marketOn();
       if (kind === 'seed') return !this.eraOk(SEED_BY_ID[id]);
       if (kind === 'sseed') return !SEED_BY_ID[id] || SEED_BY_ID[id].season !== this.seasonId;
       if (kind === 'robot') return !this.eraOk(ROBOT_BY_ID[id]) || ROBOT_BY_ID[id].chain > 0; // on n'achète que des rouillés
@@ -479,7 +482,8 @@
         else if (kind === 'robot') this.s.robots[id] = (this.s.robots[id] || 0) + 1;
         else if (kind === 'rupgrade') this.upgradeRobot(id);
         else if (kind === 'plot') this.s.plots.push(this.newPlot());
-        else if (kind === 'silo') this.s.trade.silos++;
+        else if (kind === 'silo') { this.s.trade.silos++; this.s.trade.siloTiers.push(0); }
+        else if (kind === 'smerge') this.mergeSilos(+id);
         else if (kind === 'merge') this.mergePlots(+id);
         else if (kind === 'seed') { this.s.seeds[id] = true; this.s.everSeeds[id] = true; this.emit('seed', { id }); }
         else if (kind === 'sseed') { this.s.seasonShop.bought[id] = true; this.emit('seed', { id }); }
@@ -615,7 +619,8 @@
     }
 
     // Une plante infinie est laissée de côté par les ouvriers (et pets, touristes) tant qu'elle vaut moins de ×autoAt.
-    infiniWaits(crop) { return crop.mutant === 'infini' && 1 + (crop.extra || 0) < D.MUTATIONS.infini.autoAt; }
+    // Le gestionnaire peut la marquer à renouveler (crop.renew) : elle est alors récoltée tout de suite.
+    infiniWaits(crop) { return crop.mutant === 'infini' && !crop.renew && 1 + (crop.extra || 0) < D.MUTATIONS.infini.autoAt; }
 
     // Taille de la récolte : une géante ou une infinie donne plus d'unités au silo (même valeur par unité).
     cropSize(crop) {
